@@ -48,6 +48,7 @@ class Jak2ReplClient:
     lock: Lock
     connected: bool = False
     initiated_connect: bool = False  # Signals when user tells us to try reconnecting.
+    received_deathlink: bool = False
 
     # Variables to handle the title screen and initial game connection.
     initial_item_count = -1  # Brand new games have 0 items, so initialize this to -1.
@@ -134,6 +135,10 @@ class Jak2ReplClient:
             await self.receive_item()
             await self.save_data()
             self.inbox_index += 1
+
+        if self.received_deathlink:
+            await self.receive_deathlink()
+            self.received_deathlink = False
 
         # Progressively empty the queue during each tick
         # if text messages happen to be too slow we could pool dequeuing here,
@@ -309,6 +314,26 @@ class Jak2ReplClient:
             logger.debug(f"Received {trap_name}!")
         else:
             self.log_error(logger, f"Unable to receive {trap_name}!")
+        return ok
+
+    async def receive_deathlink(self) -> bool:
+
+        # Because it should be funny sometimes, right?
+        death_types = ["\'death",
+                      "\'death",
+                      "\'death",
+                      "\'death",
+                      "\'endlessfall",
+                      "\'drown-death",
+                      "\'melt",
+                      "\'explode"]
+        chosen_death = random.choice(death_types)
+
+        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
+        if ok:
+            logger.debug(f"Received deathlink signal!")
+        else:
+            self.log_error(logger, f"Unable to receive deathlink signal!")
         return ok
 
     # OpenGOAL has a limit of 8 parameters per function. We've already hit this limit. So, define a new datatype
