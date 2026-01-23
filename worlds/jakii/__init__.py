@@ -1,6 +1,6 @@
 # Archipelago Imports
 import settings
-from Options import OptionError
+from Options import OptionError, OptionGroup
 from worlds.AutoWorld import World, WebWorld
 from worlds.LauncherComponents import components, Component, launch_subprocess, Type, icon_paths
 from BaseClasses import (Tutorial, ItemClassification as ItemClass)
@@ -62,6 +62,14 @@ class JakIIWebWorld(WebWorld):
     tutorials = [setup_en]
     bug_report_page = "https://github.com/narramoment/Archipelago/issues"
 
+    option_groups = [
+        OptionGroup("Traps", [
+            options.PercentOfFillerReplacedWithTraps,
+            options.TrapEffectDuration,
+            options.TrapWeights,
+        ])
+    ]
+
 
 class JakIIWorld(World):
     """
@@ -94,6 +102,11 @@ class JakIIWorld(World):
     # Cache option-related values.
     completion_type: int
     completion_value: int
+    total_items: int = 56
+    total_prog_items: int = 33
+    total_trap_items: int = 0
+    total_filler_items: int = 0
+    trap_weights: tuple[list[str], list[int]]
 
     def generate_early(self) -> None:
         # Cache completion conditions and values.
@@ -104,6 +117,15 @@ class JakIIWorld(World):
             self.completion_value = self.options.number_of_missions_for_completion.value
         else:
             raise OptionError(f"Unknown completion condition selected for Jak II: {self.completion_type}")
+
+        # Calculate the percent of Filler Items, also accounting for percentage to be replaced with traps.
+        if self.options.percent_of_filler_items_replaced > 0:
+            self.total_trap_items = round(((self.options.percent_of_filler_items_replaced * self.total_items) / 100))
+            self.total_filler_items = self.total_items - self.total_trap_items
+        else:
+            self.total_trap_items = 0
+
+
 
     @staticmethod
     def item_data_helper(item: int) -> list[tuple[int, ItemClass, int]]:
@@ -183,5 +205,8 @@ class JakIIWorld(World):
         options_dict = self.options.as_dict("jak_2_completion_condition",
                                             "specific_mission_for_completion",
                                             "number_of_missions_for_completion",
+                                            "percent_of_filler_items_replaced",
+                                            "trap_effect_duration",
+                                            "trap_weights",
                                             )
         return options_dict

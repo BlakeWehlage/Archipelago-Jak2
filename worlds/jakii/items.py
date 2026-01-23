@@ -72,11 +72,34 @@ item_table = {
     33: Jak2ItemData(item_id=33, name="Rift Rider", symbol="rift-rider"),
     
     # ========== FILLER ITEMS ==========
-    # Standard Filler Items (IDs 34+)
+    # Standard Filler Items (IDs 34-39)
     34: Jak2ItemData(item_id=34, name="Dark Eco Pill", symbol="dark-eco-pill"),
     35: Jak2ItemData(item_id=35, name="Health Pack", symbol="health-pack"),
     36: Jak2ItemData(item_id=37, name="Scatter Gun Ammo", symbol="ammo-red"),
     37: Jak2ItemData(item_id=38, name="Blaster Ammo", symbol="ammo-yellow"),
     38: Jak2ItemData(item_id=39, name="Vulcan Fury Ammo", symbol="ammo-blue"),
-    39: Jak2ItemData(item_id=40, name="Peacemaker Ammo", symbol="ammo-dark")
+    39: Jak2ItemData(item_id=40, name="Peacemaker Ammo", symbol="ammo-dark"),
+
+    # ========== TRAPS ==========
+    # Traps (IDs 40-56)
+    # Jak 1 Traps
+    40: Jak2ItemData(item_id=40, name="Trip Trap", symbol="trip"),
+    41: Jak2ItemData(item_id=41, name="Slip Trap", symbol="ice-physics"),
+    42: Jak2ItemData(item_id=42, name="Gravity Trap", symbol="the-big-apple"),
+    43: Jak2ItemData(item_id=43, name="Camera Trap", symbol="caught-in-4k"),
+    44: Jak2ItemData(item_id=44, name="Darkness Trap", symbol="daredevil"),
+    45: Jak2ItemData(item_id=45, name="Earthquake Trap", symbol="caseoh"),
+    46: Jak2ItemData(item_id=46, name="Teleport Trap", symbol="instant-transmission"),
+    47: Jak2ItemData(item_id=47, name="Pacifism Trap", symbol="personal-bubble"),
+    48: Jak2ItemData(item_id=48, name="Health Trap", symbol="hit-by-bus"),
+    49: Jak2ItemData(item_id=49, name="Ledge Trap", symbol="rivals-of-aether"),
+    50: Jak2ItemData(item_id=50, name="Mirror Trap", symbol="man-in-the-mirror"),
+
+    # Jak 2 Traps
+    51: Jak2ItemData(item_id=51, name="High Alert Trap", symbol="five-star"),
+    52: Jak2ItemData(item_id=52, name="Ammo Trap", symbol="russian-roulette"),
+    53: Jak2ItemData(item_id=53, name="Dark Trap", symbol="anger-issues"),
+    54: Jak2ItemData(item_id=54, name="Speed Trap", symbol="sonic-speed"),
+    55: Jak2ItemData(item_id=55, name="Slow Trap", symbol="la-traffic"),
+    56: Jak2ItemData(item_id=56, name="Hero Trap", symbol="hardcore")
 }

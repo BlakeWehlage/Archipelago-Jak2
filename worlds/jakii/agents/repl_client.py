@@ -293,6 +293,24 @@ class Jak2ReplClient:
             self.log_error(logger, f"Unable to receive {item_name}!")
         return ok
 
+    async def receive_trap(self):
+        trap = getattr(self.item_inbox[self.inbox_index], "trap")
+
+        # Determine the type of trap to receive
+        if trap not in item_table:
+            self.log_error(logger, f"Tried to receive trap with unknown AP ID {trap}!")
+            return False
+
+        trap_data: Jak2ItemData = item_table[trap]
+        trap_name: str = trap_data.name
+        trap_symbol: str = trap_data.symbol
+        ok = await self.send_form(f"(ap-trap-received! \'{trap_symbol})")
+        if ok:
+            logger.debug(f"Received {trap_name}!")
+        else:
+            self.log_error(logger, f"Unable to receive {trap_name}!")
+        return ok
+
     # OpenGOAL has a limit of 8 parameters per function. We've already hit this limit. So, define a new datatype
     # in OpenGOAL that holds all these options, instantiate the type here, and have ap-setup-options! function take
     # that instance as input.
