@@ -342,6 +342,7 @@ class Jak2ReplClient:
     async def setup_options(self,
                             slot_name: str,
                             slot_seed: str,
+                            trap_time: int,
                             completion_type: int,
                             completion_value: int) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
@@ -350,11 +351,13 @@ class Jak2ReplClient:
         ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
                                   f":slot-name {sanitized_name} "
                                   f":slot-seed {sanitized_seed} "
+                                  f":trap-duration {trap_time}.0"
                                   f":completion-type {completion_type} "
                                   f":completion-value {completion_value} ))")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
+                   f"   Trap Duration {trap_time}, \n"
                    f"   Goal Type {completion_type}, \n"
                    f"   Goal Value {completion_value}... ")
         if ok:
