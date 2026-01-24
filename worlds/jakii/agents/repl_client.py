@@ -48,6 +48,7 @@ class Jak2ReplClient:
     lock: Lock
     connected: bool = False
     initiated_connect: bool = False  # Signals when user tells us to try reconnecting.
+    received_deathlink: bool = False
 
     # Variables to handle the title screen and initial game connection.
     initial_item_count = -1  # Brand new games have 0 items, so initialize this to -1.
@@ -134,6 +135,10 @@ class Jak2ReplClient:
             await self.receive_item()
             await self.save_data()
             self.inbox_index += 1
+
+        if self.received_deathlink:
+            await self.receive_deathlink()
+            self.received_deathlink = False
 
         # Progressively empty the queue during each tick
         # if text messages happen to be too slow we could pool dequeuing here,
@@ -293,12 +298,51 @@ class Jak2ReplClient:
             self.log_error(logger, f"Unable to receive {item_name}!")
         return ok
 
+    async def receive_trap(self):
+        trap = getattr(self.item_inbox[self.inbox_index], "trap")
+
+        # Determine the type of trap to receive
+        if trap not in item_table:
+            self.log_error(logger, f"Tried to receive trap with unknown AP ID {trap}!")
+            return False
+
+        trap_data: Jak2ItemData = item_table[trap]
+        trap_name: str = trap_data.name
+        trap_symbol: str = trap_data.symbol
+        ok = await self.send_form(f"(ap-trap-received! \'{trap_symbol})")
+        if ok:
+            logger.debug(f"Received {trap_name}!")
+        else:
+            self.log_error(logger, f"Unable to receive {trap_name}!")
+        return ok
+
+    async def receive_deathlink(self) -> bool:
+
+        # Because it should be funny sometimes, right?
+        death_types = ["\'death",
+                      "\'death",
+                      "\'death",
+                      "\'death",
+                      "\'endlessfall",
+                      "\'drown-death",
+                      "\'melt",
+                      "\'explode"]
+        chosen_death = random.choice(death_types)
+
+        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
+        if ok:
+            logger.debug(f"Received deathlink signal!")
+        else:
+            self.log_error(logger, f"Unable to receive deathlink signal!")
+        return ok
+
     # OpenGOAL has a limit of 8 parameters per function. We've already hit this limit. So, define a new datatype
     # in OpenGOAL that holds all these options, instantiate the type here, and have ap-setup-options! function take
     # that instance as input.
     async def setup_options(self,
                             slot_name: str,
                             slot_seed: str,
+                            trap_time: int,
                             completion_type: int,
                             completion_value: int) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
@@ -307,11 +351,13 @@ class Jak2ReplClient:
         ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
                                   f":slot-name {sanitized_name} "
                                   f":slot-seed {sanitized_seed} "
+                                  f":trap-duration {trap_time}.0"
                                   f":completion-type {completion_type} "
                                   f":completion-value {completion_value} ))")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
+                   f"   Trap Duration {trap_time}, \n"
                    f"   Goal Type {completion_type}, \n"
                    f"   Goal Value {completion_value}... ")
         if ok:

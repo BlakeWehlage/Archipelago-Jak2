@@ -22,7 +22,7 @@ sizeof_float = 4
 # *****************************************************************************
 # **** This number must match (-> *ap-info-jak2* version) in ap-struct.gc! ****
 # *****************************************************************************
-expected_memory_version = 3
+expected_memory_version = 4
 
 
 # IMPORTANT: OpenGOAL memory structures are particular about the alignment, in memory, of member elements according to
@@ -49,6 +49,11 @@ class OffsetFactory:
 # Start defining important memory address offsets here. They must be in the same order, have the same sizes, and have
 # the same lengths, as defined in `ap-info-jak2`.
 offsets = OffsetFactory()
+
+# Deathlink Information
+death_count_offset = offsets.define(sizeof_uint32)
+death_cause_offset = offsets.define(sizeof_uint8)
+deathlink_enabled_offset = offsets.define(sizeof_uint8)
 
 # Memory version (uint32 in GOAL)
 memory_version_offset = offsets.define(sizeof_uint32)
@@ -78,6 +83,52 @@ end_marker_offset = offsets.define(sizeof_uint8, 4)
 def as_float(value: int) -> int:
     return int(struct.unpack('f', value.to_bytes(sizeof_float, "little"))[0])
 
+def autopsy(cause: int) -> str:
+    if cause in[1, 2, 3, 4]:
+        return random.choice(["Jak said goodnight.",
+                              "Jak stepped into the light.",
+                              "Jak gave Daxter his insect collection.",
+                              "Jak didn't follow step 1."])
+    if cause == 5:
+        return "Jak couldn't hang with the robots."
+    if cause == 6:
+        return "Jak was turned into an egg!"
+    if cause == 7:
+        return "Jak never found the ground."
+    if cause == 8:
+        return "Jak had a skill issue."
+    if cause == 9:
+        return "Jak hit 2000 degrees."
+    if cause == 10:
+        return "Jak reached their melting point."
+    if cause == 11:
+        return "Jak exploded."
+    if cause == 12:
+        return "Jak exploded big."
+    if cause == 13:
+        return "Jak was gunned down."
+    if cause == 14:
+        return "Jak hit the ground too hard."
+    if cause == 15:
+        return "Jak got hit a little too hard."
+    if cause == 16:
+        return "Jak forgot to wear insulated gloves."
+    if cause == 17:
+        return "Jak was crushed."
+    if cause == 18:
+        return "Jak... is gone. :("
+    if cause == 19:
+        return "Jak exploded :("
+    if cause == 20:
+        return "Jak ran out of air."
+    if cause == 21:
+        return "Jak couldn't handle the heat."
+    if cause == 22:
+        return "Jak was torched."
+    if cause == 23:
+        return "Jak failed the mission."
+    return "Jak died."
+
 
 class Jak2MemoryReader:
     marker: ByteString
@@ -92,10 +143,17 @@ class Jak2MemoryReader:
     outbox_index: int = 0
     finished_game: bool = False
 
+    # Deathlink handling
+    deathlink_enabled: bool = False
+    send_deathlink: bool = False
+    cause_of_death: str = ""
+    death_count: int = 0
+
     # Game-related callbacks (inform the AP server of changes to game state)
     inform_checked_location: Callable
     inform_finished_game: Callable
     inform_died: Callable
+    inform_toggled_deathlink: Callable
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
@@ -107,6 +165,8 @@ class Jak2MemoryReader:
     def __init__(self,
                  location_check_callback: Callable,
                  finish_game_callback: Callable,
+                 send_deathlink_callback: Callable,
+                 toggle_deathlink_callback: Callable,
                  log_error_callback: Callable,
                  log_warn_callback: Callable,
                  log_success_callback: Callable,
@@ -116,6 +176,8 @@ class Jak2MemoryReader:
 
         self.inform_checked_location = location_check_callback
         self.inform_finished_game = finish_game_callback
+        self.inform_died = send_deathlink_callback
+        self.inform_toggled_deathlink = toggle_deathlink_callback
 
         self.log_error = log_error_callback
         self.log_warn = log_warn_callback
@@ -145,6 +207,10 @@ class Jak2MemoryReader:
             return
 
         if self.connected:
+
+            # Save some state variables temporarily.
+            old_deathlink_enabled = self.deathlink_enabled
+
             # Read the memory address to check the state of the game.
             self.read_memory()
 
@@ -156,6 +222,13 @@ class Jak2MemoryReader:
 
             if self.finished_game:
                 self.inform_finished_game()
+
+            if old_deathlink_enabled != self.deathlink_enabled:
+                self.inform_toggled_deathlink()
+                logger.debug("Toggled Deathlink " + ("ON" if self.deathlink_enabled else "OFF"))
+
+            if self.send_deathlink:
+                self.inform_died()
 
     async def connect(self):
         try:
@@ -282,6 +355,17 @@ class Jak2MemoryReader:
             if completed > 0 and not self.finished_game:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
+
+            death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
+            death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
+            if death_count > self.death_count:
+                self.cause_of_death = autopsy(death_cause)
+                self.send_deathlink = True
+                self.death_count += 1
+
+            # Listen to any changes to this setting!
+            deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
+            self.deathlink_enabled = bool(deathlink_flag)
 
         except (ProcessError, MemoryReadError, WinAPIError):
             msg = (f"Error reading game memory! (Did the game crash?)\n"
