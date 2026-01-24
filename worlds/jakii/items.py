@@ -14,12 +14,24 @@ class Jak2ItemData:
         self.name = name
         self.symbol = symbol
 
+class Jak2TrapData:
+    id: int
+    name: str
+    symbol: str
+
+    def __init__(self, trap_id: int, name: str, symbol: str) -> None:
+        self.trap_id = trap_id
+        self.name = name
+        self.symbol = symbol
+
 # ID Range Constants for Item Classification
 # These constants define the boundaries for different item types
 ITEM_ID_KEY_START = 1           # Key/progression items start at ID 1
 ITEM_ID_KEY_END = 33            # Key/progression items end at ID 33
 ITEM_ID_FILLER_START = 34       # Filler items start at ID 34 (Dark Eco Pill)
-ITEM_ID_FILLER_END = 50         # Standard filler items end here (room for expansion)
+ITEM_ID_FILLER_END = 39         # Standard filler items end at ID 39
+TRAP_ID_START = 1               # Trap items start at ID 1 (Trip Trap)
+TRAP_ID_END = 17                # Trap items end at ID 17
 
 # Unified Item Table - Single source of truth for all items
 # Every item is organized by classification using ID ranges defined above
@@ -72,11 +84,35 @@ item_table = {
     33: Jak2ItemData(item_id=33, name="Rift Rider", symbol="rift-rider"),
     
     # ========== FILLER ITEMS ==========
-    # Standard Filler Items (IDs 34+)
+    # Standard Filler Items (IDs 34-39)
     34: Jak2ItemData(item_id=34, name="Dark Eco Pill", symbol="dark-eco-pill"),
     35: Jak2ItemData(item_id=35, name="Health Pack", symbol="health-pack"),
-    36: Jak2ItemData(item_id=37, name="Scatter Gun Ammo", symbol="ammo-red"),
-    37: Jak2ItemData(item_id=38, name="Blaster Ammo", symbol="ammo-yellow"),
-    38: Jak2ItemData(item_id=39, name="Vulcan Fury Ammo", symbol="ammo-blue"),
-    39: Jak2ItemData(item_id=40, name="Peacemaker Ammo", symbol="ammo-dark")
+    36: Jak2ItemData(item_id=36, name="Scatter Gun Ammo", symbol="ammo-red"),
+    37: Jak2ItemData(item_id=37, name="Blaster Ammo", symbol="ammo-yellow"),
+    38: Jak2ItemData(item_id=38, name="Vulcan Fury Ammo", symbol="ammo-blue"),
+    39: Jak2ItemData(item_id=39, name="Peacemaker Ammo", symbol="ammo-dark"),
+}
+
+trap_table = {
+    # Trap Items (IDs 40-56)
+    # Jak 1 Traps, Reimagined for Jak 2! (IDs 40-50)
+    1: Jak2TrapData(trap_id=1, name="Trip Trap", symbol="trip"),
+    2: Jak2TrapData(trap_id=2, name="Slip Trap", symbol="ice-physics"),
+    3: Jak2TrapData(trap_id=3, name="Gravity Trap", symbol="the-big-apple"),
+    4: Jak2TrapData(trap_id=4, name="Camera Trap", symbol="caught-in-4k"),
+    5: Jak2TrapData(trap_id=5, name="Darkness Trap", symbol="daredevil"),
+    6: Jak2TrapData(trap_id=6, name="Earthquake Trap", symbol="caseoh"),
+    7: Jak2TrapData(trap_id=7, name="Teleport Trap", symbol="instant-transmission"),
+    8: Jak2TrapData(trap_id=8, name="Pacifism Trap", symbol="personal-bubble"),
+    9: Jak2TrapData(trap_id=9, name="Health Trap", symbol="hit-by-bus"),
+    10: Jak2TrapData(trap_id=10, name="Ledge Trap", symbol="rivals-of-aether"),
+    11: Jak2TrapData(trap_id=11, name="Mirror Trap", symbol="man-in-the-mirror"),
+
+    # Brand New Jak 2 Traps! (IDs 51-56)
+    12: Jak2TrapData(trap_id=12, name="High Alert Trap", symbol="five-star"),
+    13: Jak2TrapData(trap_id=13, name="Ammo Trap", symbol="russian-roulette"),
+    14: Jak2TrapData(trap_id=14, name="Dark Trap", symbol="anger-issues"),
+    15: Jak2TrapData(trap_id=15, name="Speed Trap", symbol="sonic-speed"),
+    16: Jak2TrapData(trap_id=16, name="Slow Trap", symbol="la-traffic"),
+    17: Jak2TrapData(trap_id=17, name="Hero Trap", symbol="hardcore")
 }

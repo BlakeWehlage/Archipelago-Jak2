@@ -1,6 +1,6 @@
 # Archipelago Imports
 import settings
-from Options import OptionError
+from Options import OptionError, OptionGroup
 from worlds.AutoWorld import World, WebWorld
 from worlds.LauncherComponents import components, Component, launch_subprocess, Type, icon_paths
 from BaseClasses import (Tutorial, ItemClassification as ItemClass)
@@ -9,9 +9,9 @@ from typing import cast, ClassVar, Any
 # Jak 2 imports
 from . import options
 from .game_id import jak2_name, jak2_max
-from .items import (item_table, 
-                    ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END,
-                    Jak2ItemData, Jak2Item)
+from .items import (item_table, trap_table,
+                    ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END, TRAP_ID_START,
+                    TRAP_ID_END, Jak2ItemData, Jak2Item, Jak2TrapData)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
 from .locs.mission_locations import Jak2MissionData
@@ -61,6 +61,13 @@ class JakIIWebWorld(WebWorld):
 
     tutorials = [setup_en]
     bug_report_page = "https://github.com/narramoment/Archipelago/issues"
+    option_groups = [
+        OptionGroup("Traps", [
+            options.PercentOfFillerItemsReplacedWithTraps,
+            options.TrapEffectDuration,
+            options.TrapWeights
+        ])
+    ]
 
 
 class JakIIWorld(World):
@@ -94,6 +101,11 @@ class JakIIWorld(World):
     # Cache option-related values.
     completion_type: int
     completion_value: int
+    total_items: int = 56
+    total_prog_items: int = 33
+    total_filler_items: int = 0
+    total_trap_items: int = 0
+    trap_weights: tuple[list[str], list[int]]
 
     def generate_early(self) -> None:
         # Cache completion conditions and values.
@@ -105,6 +117,14 @@ class JakIIWorld(World):
         else:
             raise OptionError(f"Unknown completion condition selected for Jak II: {self.completion_type}")
 
+        # Calculate Filler and Traps, if applicable
+        if self.options.percent_filler_replaced_with_traps > 0:
+            self.total_trap_items = (
+                (self.options.percent_filler_replaced_with_traps / 100) * (self.total_items - self.total_prog_items))
+            self.total_filler_items = self.total_items - self.total_prog_items - self.total_trap_items
+
+        self.trap_weights = self.options.trap_weights.weighted_pair
+
     @staticmethod
     def item_data_helper(item: int) -> list[tuple[int, ItemClass, int]]:
         # count,num,classification
@@ -115,13 +135,17 @@ class JakIIWorld(World):
             # Key/progression items (IDs 1-33)
             data.append((1, ItemClass.progression | ItemClass.useful, 0))
         elif ITEM_ID_FILLER_START <= item <= ITEM_ID_FILLER_END:
-            # Filler items (ID 34+ or high-range jak2_max-10 to jak2_max)
+            # Filler items (IDs 34-39)
             data.append((1, ItemClass.filler, 0))
+        elif TRAP_ID_START <= item <= TRAP_ID_END:
+
+            data.append((1, ItemClass.trap, 0))
         else:
             # If we try to make items with ID's outside defined ranges, something has gone wrong
             raise KeyError(f"Tried to fill item pool with unknown ID {item}. Valid ranges: "
                            f"key items ({ITEM_ID_KEY_START}-{ITEM_ID_KEY_END}), "
-                           f"filler items ({ITEM_ID_FILLER_START}-{ITEM_ID_FILLER_END})")
+                           f"filler items ({ITEM_ID_FILLER_START}-{ITEM_ID_FILLER_END})"
+                           f"trap items ({TRAP_ID_START}-{TRAP_ID_END})")
         return data
 
     def create_items(self) -> None:
@@ -134,6 +158,15 @@ class JakIIWorld(World):
                 self.multiworld.itempool += [Jak2Item(item_name, classification, item_id, self.player)
                                              for _ in range(count)]
                 items_made += 1
+
+        # Handle Traps (fr!!)
+        # Manually filling the item pool with an assortment of traps. Only done if one or more traps have a weight > 0.
+        names, weights = self.trap_weights
+        if sum(weights):
+            total_traps = self.replaced_filler
+            trap_list = self.random.choices(names, weights=weights, k=total_traps)
+            self.multiworld.itempool += [self.create_item(trap_name) for trap_name in trap_list]
+            items_made += total_traps
 
         all_regions = self.multiworld.get_regions(self.player)
         total_locations = sum(reg.location_count for reg in cast(list[JakIIRegion], all_regions))
@@ -150,6 +183,12 @@ class JakIIWorld(World):
         filler_item_names = ["Dark Eco Pill", "Health Pack", "Scatter Gun Ammo", "Blaster Ammo", "Vulcan Fury Ammo",
                              "Peacemaker Ammo"]
         return self.random.choice(filler_item_names)
+
+    def get_trap_item_name(self) -> str:
+        trap_item_names = ["Trip Trap", "Slip Trap", "Gravity Trap", "Camera Trap", "Darkness Trap", "Earthquake Trap",
+                           "Teleport Trap", "Pacifism Trap", "Health Trap", "Ledge Trap", "Mirror Trap",
+                           "High Alert Trap", "Ammo Trap", "Dark Trap", "Speed Trap", "Slow Trap", "Hero Trap"]
+        return self.random.choice(trap_item_names)
 
     def create_regions(self) -> None:
 
@@ -183,5 +222,8 @@ class JakIIWorld(World):
         options_dict = self.options.as_dict("jak_2_completion_condition",
                                             "specific_mission_for_completion",
                                             "number_of_missions_for_completion",
+                                            "percent_filler_replaced_with_traps",
+                                            "trap_effect_duration",
+                                            "trap_weights",
                                             )
         return options_dict
