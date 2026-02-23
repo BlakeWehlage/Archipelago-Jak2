@@ -1,7 +1,7 @@
 # Jak II (ArchipelaGOAL II)
-___
+
 ## What does randomization do?
-___
+
 The game currently contains the following Location Checks:
 - All 65 Main Missions
 - All 27 Side Missions (all the ones listed on the wiki, plus two races and the jet board challenge)
@@ -10,7 +10,7 @@ These may contain items for different games, as well as items within Jak II.
 In addition, the rewards that you get from the main missions are scattered across the multiworld!
 
 ## What are the Special Items? What do they unlock (if applicable)?
-___
+
 ### Morph Gun/Upgrades
 - Scatter Gun
 - Blaster
@@ -60,13 +60,13 @@ ___
 - Rift Rider
 
 ## How do I know what Special Items I have?
-___
+
 Open the Pause Menu, navigate to `Game Options`, then `Archipelago Options`, then `Item Tracker`.
 This will show you a list of the Special Items of the game.
 Indications of "Locked" or "Unlocked" determine whether the items are currently in your possession.
 
 ## What is the goal of the game once randomized?
-___
+
 Currently, the default goal is to raid the Metal Head Nest and defeat Metal Kor. In order to do so, you need access to 
 the Air Train, any gun, and all the following:
 - The Heart of Mar
@@ -79,14 +79,14 @@ In addition, you may also choose to complete a given number of missions of your 
 ninety-two at max!
 
 ## What happens when I complete a mission, main or side?
-___
+
 When you complete a mission in game, two things will occur. Firstly, the task will be marked as completed in the game's 
 mission list, and your Jak II client will tell you what item you sent out or received.
 In the case of the side missions, a similar case will occur, in that you will receive the respective precursor orbs in 
 game, as well as your text client telling you what you found and who it belongs to.
 
 ## What do traps do?
-___
+
 When creating your player YAML file, you have the option of replacing a certain percentage of filler items with traps.
 You can choose which traps you want to generate in your seed, as well as how long they last. A random assortment will
 then be chosen to populate the item pool.
@@ -96,7 +96,7 @@ range from a small nuisance to maddeningly annoying. When the trap ends, the gam
 Multiple traps can be active at the same time, and they may interact with each other in strange ways.
 
 ## What kind of traps are there?
-___
+
 ## Jak and Daxter Traps
 ### "(almost) All the traps you love, back for more mischief!"
 
@@ -130,13 +130,13 @@ ___
 | Hero Trap       | The world gains the properties of the game's "Hero Mode" difficulty   |
 
 ## I got soft-locked and I can't leave, how do I get out of this?
-___
+
 Open the pause menu, navigate to `Restart/Quit`, then `Go to Hideout`, then `Yes`.
 Selecting this option will put you in the alleyway outside the Underground Hideout. From there, you can make your way
 back to where you were prior to getting stuck.
 
 ## I think I found a bug, where should I report it?
-___
+
 Depending on the nature of the bug, there are a few options:
 
 * If you found a logical error in the randomizer, please create a new Issue

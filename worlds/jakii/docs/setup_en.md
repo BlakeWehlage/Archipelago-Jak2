@@ -1,11 +1,11 @@
 # Jak II (ArchipelaGOAL II) Setup Guide
-___
+
 ## Required Software
-___
+
 * A **legally purchased** copy of _Jak II_.
 * [The OpenGOAL Launcher](https://opengoal.dev/).
 ## Installation via OpenGOAL Launcher
-___
+
 **You must set up a vanilla installation of Jak II before you can install mods for it.** These instructions will work on
 both NTSC and PAL versions of the game.
 
@@ -22,7 +22,7 @@ for you.
 - Once the mod is installed, in the bottom right corner, click `Advanced`, then `Compile`.
 
 ## Updates and New Releases via the OpenGOAL Launcher
-___
+
 If you are in the middle of an async game, and you do not want to update the mod, you do not need to do this step.
 The mod will only update when you tell it to.
 
@@ -34,7 +34,7 @@ The mod will only update when you tell it to.
 - **Now, you must click `Advanced`, then `Compile`, in order for the update to take effect.**
 
 ## Starting a Game
-___
+
 ### New Game
 
 - Run the Archipelago Launcher.
@@ -67,7 +67,7 @@ The same steps as starting a New Game apply, with some key exceptions:
 game.
 
 ## Troubleshooting
-___
+
 ### The Text Client says "Unable to locate the OpenGOAL install directory"
 
 Normally, the Archipelago client should be able to find your OpenGOAL installation automatically.
