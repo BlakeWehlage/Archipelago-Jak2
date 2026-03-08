@@ -4,6 +4,9 @@ from .game_id import jak2_name, jak2_max
 class Jak2Item(Item):
     game: str = jak2_name
 
+class Jak2Trap(Item):
+    game: str = jak2_max
+
 class Jak2ItemData:
     id: int
     name: str

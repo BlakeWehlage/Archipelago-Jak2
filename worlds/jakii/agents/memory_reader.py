@@ -51,9 +51,9 @@ class OffsetFactory:
 offsets = OffsetFactory()
 
 # Deathlink Information
-death_count_offset = offsets.define(sizeof_uint32)
-death_cause_offset = offsets.define(sizeof_uint8)
-deathlink_enabled_offset = offsets.define(sizeof_uint8)
+# death_count_offset = offsets.define(sizeof_uint32)
+# death_cause_offset = offsets.define(sizeof_uint8)
+# deathlink_enabled_offset = offsets.define(sizeof_uint8)
 
 # Memory version (uint32 in GOAL)
 memory_version_offset = offsets.define(sizeof_uint32)
@@ -144,16 +144,16 @@ class Jak2MemoryReader:
     finished_game: bool = False
 
     # Deathlink handling
-    deathlink_enabled: bool = False
-    send_deathlink: bool = False
-    cause_of_death: str = ""
-    death_count: int = 0
+    # deathlink_enabled: bool = False
+    # send_deathlink: bool = False
+    # cause_of_death: str = ""
+    # death_count: int = 0
 
     # Game-related callbacks (inform the AP server of changes to game state)
     inform_checked_location: Callable
     inform_finished_game: Callable
     inform_died: Callable
-    inform_toggled_deathlink: Callable
+    # inform_toggled_deathlink: Callable
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
@@ -165,8 +165,8 @@ class Jak2MemoryReader:
     def __init__(self,
                  location_check_callback: Callable,
                  finish_game_callback: Callable,
-                 send_deathlink_callback: Callable,
-                 toggle_deathlink_callback: Callable,
+                 # send_deathlink_callback: Callable,
+                 # toggle_deathlink_callback: Callable,
                  log_error_callback: Callable,
                  log_warn_callback: Callable,
                  log_success_callback: Callable,
@@ -176,8 +176,8 @@ class Jak2MemoryReader:
 
         self.inform_checked_location = location_check_callback
         self.inform_finished_game = finish_game_callback
-        self.inform_died = send_deathlink_callback
-        self.inform_toggled_deathlink = toggle_deathlink_callback
+        # self.inform_died = send_deathlink_callback
+        # self.inform_toggled_deathlink = toggle_deathlink_callback
 
         self.log_error = log_error_callback
         self.log_warn = log_warn_callback
@@ -209,7 +209,7 @@ class Jak2MemoryReader:
         if self.connected:
 
             # Save some state variables temporarily.
-            old_deathlink_enabled = self.deathlink_enabled
+            # old_deathlink_enabled = self.deathlink_enabled
 
             # Read the memory address to check the state of the game.
             self.read_memory()
@@ -223,12 +223,12 @@ class Jak2MemoryReader:
             if self.finished_game:
                 self.inform_finished_game()
 
-            if old_deathlink_enabled != self.deathlink_enabled:
-                self.inform_toggled_deathlink()
-                logger.debug("Toggled Deathlink " + ("ON" if self.deathlink_enabled else "OFF"))
+            # if old_deathlink_enabled != self.deathlink_enabled:
+            #    self.inform_toggled_deathlink()
+            #    logger.debug("Toggled Deathlink " + ("ON" if self.deathlink_enabled else "OFF"))
 
-            if self.send_deathlink:
-                self.inform_died()
+            #if self.send_deathlink:
+            #    self.inform_died()
 
     async def connect(self):
         try:
@@ -356,16 +356,16 @@ class Jak2MemoryReader:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
 
-            death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
-            death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
-            if death_count > self.death_count:
-                self.cause_of_death = autopsy(death_cause)
-                self.send_deathlink = True
-                self.death_count += 1
+            # death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
+            # death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
+            #if death_count > self.death_count:
+            #    self.cause_of_death = autopsy(death_cause)
+            #    self.send_deathlink = True
+            #    self.death_count += 1
 
             # Listen to any changes to this setting!
-            deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
-            self.deathlink_enabled = bool(deathlink_flag)
+            # deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
+            # self.deathlink_enabled = bool(deathlink_flag)
 
         except (ProcessError, MemoryReadError, WinAPIError):
             msg = (f"Error reading game memory! (Did the game crash?)\n"

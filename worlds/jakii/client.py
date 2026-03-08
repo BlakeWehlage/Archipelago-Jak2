@@ -105,8 +105,8 @@ class Jak2Context(CommonContext):
                                    self.on_log_info)
         self.memr = Jak2MemoryReader(self.on_location_check,
                                      self.on_finish_check,
-                                     self.on_deathlink_check,
-                                     self.on_deathlink_toggle,
+                                     # self.on_deathlink_check,
+                                     # self.on_deathlink_toggle,
                                      self.on_log_error,
                                      self.on_log_warn,
                                      self.on_log_success,
@@ -163,7 +163,7 @@ class Jak2Context(CommonContext):
                     completion_value))
 
             # Tell the server if Deathlink is enabled or disabled in-game, allowing us to "remember" the user's choice.
-            self.on_deathlink_toggle()
+            # self.on_deathlink_toggle()
 
         if cmd == "ReceivedItems":
 
@@ -225,10 +225,10 @@ class Jak2Context(CommonContext):
         super(Jak2Context, self).on_print_json(args)
 
     # We need to do a little more than just use CommonClient's on_deathlink.
-    def on_deathlink(self, data: dict):
-        if self.memr.deathlink_enabled:
-            self.repl.received_deathlink = True
-            super().on_deathlink(data)
+    # def on_deathlink(self, data: dict):
+    #    if self.memr.deathlink_enabled:
+    #        self.repl.received_deathlink = True
+    #        super().on_deathlink(data)
 
     # We don't need an ap_inform function because check_locations solves that need.
     def on_location_check(self, location_ids: list[int]):
@@ -244,23 +244,23 @@ class Jak2Context(CommonContext):
     def on_finish_check(self):
         create_task_log_exception(self.ap_inform_finished_game())
 
-    async def ap_inform_deathlink(self):
-        if self.memr.deathlink_enabled:
-            player = self.player_names[self.slot] if self.slot is not None else "Jak"
-            death_text = self.memr.cause_of_death.replace("Jak", player)
-            await self.send_death(death_text)
-            self.on_log_warn(logger, death_text)
+    # async def ap_inform_deathlink(self):
+    #    if self.memr.deathlink_enabled:
+    #        player = self.player_names[self.slot] if self.slot is not None else "Jak"
+    #        death_text = self.memr.cause_of_death.replace("Jak", player)
+    #        await self.send_death(death_text)
+    #        self.on_log_warn(logger, death_text)
 
         # Reset all flags, but leave the death count alone.
-        self.memr.send_deathlink = False
-        self.memr.cause_of_death = ""
+    #    self.memr.send_deathlink = False
+    #    self.memr.cause_of_death = ""
 
-    def on_deathlink_check(self):
-        create_task_log_exception(self.ap_inform_deathlink())
+    # def on_deathlink_check(self):
+    #    create_task_log_exception(self.ap_inform_deathlink())
 
     # We don't need an ap_inform function because update_death_link solves that need.
-    def on_deathlink_toggle(self):
-        create_task_log_exception(self.update_death_link(self.memr.deathlink_enabled))
+    # def on_deathlink_toggle(self):
+    #    create_task_log_exception(self.update_death_link(self.memr.deathlink_enabled))
 
     def _markup_panels(self, msg: str, c: str = None):
         color = self.jsontotextparser.color_codes[c] if c else None

@@ -49,7 +49,7 @@ class TrapEffectDuration(Range):
     display_name = "Trap Effect Duration"
     range_start = 5
     range_end = 60
-    default = 30
+    default = 0
 
 
 class TrapWeights(OptionCounter):
@@ -61,8 +61,10 @@ class TrapWeights(OptionCounter):
     """
     display_name = "Trap Weights"
     min = 0
-    default = {trap: 1 for trap in trap_table.values()}
-    valid_keys = sorted({trap for trap in trap_table.values()})
+
+    # Use trap names as keys
+    default = {trap.name: 1 for trap in trap_table.values()}
+    valid_keys = sorted({trap.name for trap in trap_table.values()})
 
     @cached_property
     def weighted_pair(self) -> tuple[list[str], list[int]]:

@@ -11,7 +11,7 @@ from . import options
 from .game_id import jak2_name, jak2_max
 from .items import (item_table, trap_table,
                     ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END, TRAP_ID_START,
-                    TRAP_ID_END, Jak2ItemData, Jak2Item, Jak2TrapData)
+                    TRAP_ID_END, Jak2ItemData, Jak2Item, Jak2TrapData, Jak2Trap)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
 from .locs.mission_locations import Jak2MissionData
@@ -93,8 +93,23 @@ class JakIIWorld(World):
     settings: ClassVar[Jak2Settings]
 
     item_name_to_id = {item_data.name: k for k, item_data in item_table.items()}
+
+    # Add traps with offset so IDs can continue
+    item_name_to_id.update({
+        trap_data.name: ITEM_ID_FILLER_END + trap_id
+        for trap_id, trap_data in trap_table.items()
+    })
+
+    trap_name_to_id = {
+        trap_data.name: ITEM_ID_FILLER_END + trap_id
+        for trap_id, trap_data in trap_table.items()
+    }
+
     location_name_to_id = {data.name: k for k, data in all_locations_table.items()}
-    item_name_groups = {}
+    item_name_groups = {
+        "Items": {item.name for item in item_table.values()},
+        "Traps": {trap.name for trap in trap_table.values()}
+    }
     location_name_groups = {}
     origin_region_name = "Mission Tree"
 
@@ -120,7 +135,9 @@ class JakIIWorld(World):
         # Calculate Filler and Traps, if applicable
         if self.options.percent_filler_replaced_with_traps > 0:
             self.total_trap_items = (
-                (self.options.percent_filler_replaced_with_traps / 100) * (self.total_items - self.total_prog_items))
+                int((
+                    self.options.percent_filler_replaced_with_traps / 100) * (self.total_items - self.total_prog_items))
+                )
             self.total_filler_items = self.total_items - self.total_prog_items - self.total_trap_items
 
         self.trap_weights = self.options.trap_weights.weighted_pair
@@ -135,11 +152,11 @@ class JakIIWorld(World):
             # Key/progression items (IDs 1-33)
             data.append((1, ItemClass.progression | ItemClass.useful, 0))
         elif ITEM_ID_FILLER_START <= item <= ITEM_ID_FILLER_END:
-            # Filler items (IDs 34-39)
-            data.append((1, ItemClass.filler, 0))
-        elif TRAP_ID_START <= item <= TRAP_ID_END:
-
-            data.append((1, ItemClass.trap, 0))
+            # Filler items (IDs 34-39) (will be made manually)
+            data.append((0, ItemClass.filler, 0))
+        elif ITEM_ID_FILLER_END + TRAP_ID_START <= item <= ITEM_ID_FILLER_END + TRAP_ID_END:
+            # Trap Items (their own table) (will also be made manually)
+            data.append((0, ItemClass.trap, 0))
         else:
             # If we try to make items with ID's outside defined ranges, something has gone wrong
             raise KeyError(f"Tried to fill item pool with unknown ID {item}. Valid ranges: "
@@ -159,15 +176,25 @@ class JakIIWorld(World):
                                              for _ in range(count)]
                 items_made += 1
 
+            # Skip Traps!
+            if item_name in self.item_name_groups["Traps"]:
+                continue
+
+        all_regions = self.multiworld.get_regions(self.player)
+        total_locations = sum(reg.location_count for reg in cast(list[JakIIRegion], all_regions))
+        total_filler = total_locations - items_made
+        self.multiworld.itempool += [self.create_filler() for _ in range(total_filler)]
+
         # Handle Traps (fr!!)
         # Manually filling the item pool with an assortment of traps. Only done if one or more traps have a weight > 0.
         names, weights = self.trap_weights
         if sum(weights):
-            total_traps = self.replaced_filler
+            total_traps = self.total_trap_items
             trap_list = self.random.choices(names, weights=weights, k=total_traps)
             self.multiworld.itempool += [self.create_item(trap_name) for trap_name in trap_list]
             items_made += total_traps
 
+        # Handle Unfilled Locations!
         all_regions = self.multiworld.get_regions(self.player)
         total_locations = sum(reg.location_count for reg in cast(list[JakIIRegion], all_regions))
         total_filler = total_locations - items_made
@@ -183,12 +210,6 @@ class JakIIWorld(World):
         filler_item_names = ["Dark Eco Pill", "Health Pack", "Scatter Gun Ammo", "Blaster Ammo", "Vulcan Fury Ammo",
                              "Peacemaker Ammo"]
         return self.random.choice(filler_item_names)
-
-    def get_trap_item_name(self) -> str:
-        trap_item_names = ["Trip Trap", "Slip Trap", "Gravity Trap", "Camera Trap", "Darkness Trap", "Earthquake Trap",
-                           "Teleport Trap", "Pacifism Trap", "Health Trap", "Ledge Trap", "Mirror Trap",
-                           "High Alert Trap", "Ammo Trap", "Dark Trap", "Speed Trap", "Slow Trap", "Hero Trap"]
-        return self.random.choice(trap_item_names)
 
     def create_regions(self) -> None:
 

@@ -15,6 +15,7 @@ import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
 
 from NetUtils import NetworkItem
+from .. import trap_table
 from ..items import item_table, Jak2ItemData
 
 logger = logging.getLogger("Jak2ReplClient")
@@ -302,11 +303,11 @@ class Jak2ReplClient:
         trap = getattr(self.item_inbox[self.inbox_index], "trap")
 
         # Determine the type of trap to receive
-        if trap not in item_table:
+        if trap not in trap_table:
             self.log_error(logger, f"Tried to receive trap with unknown AP ID {trap}!")
             return False
 
-        trap_data: Jak2ItemData = item_table[trap]
+        trap_data: Jak2ItemData = trap_table[trap]
         trap_name: str = trap_data.name
         trap_symbol: str = trap_data.symbol
         ok = await self.send_form(f"(ap-trap-received! \'{trap_symbol})")
@@ -315,8 +316,8 @@ class Jak2ReplClient:
         else:
             self.log_error(logger, f"Unable to receive {trap_name}!")
         return ok
-
-    async def receive_deathlink(self) -> bool:
+    # NOTE: Deathlink is coming later
+    # async def receive_deathlink(self) -> bool:
 
         # Because it should be funny sometimes, right?
         death_types = ["\'death",
