@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from Options import PerGameCommonOptions, StartInventoryPool, Choice, Range, OptionCounter
-from .items import trap_table
+from .items import item_table, TRAP_ID_START, TRAP_ID_END
 
 
 class CompletionCondition(Choice):
@@ -63,8 +63,10 @@ class TrapWeights(OptionCounter):
     min = 0
 
     # Use trap names as keys
-    default = {trap.name: 1 for trap in trap_table.values()}
-    valid_keys = sorted({trap.name for trap in trap_table.values()})
+    traps = [trap for key, trap in item_table.items() if TRAP_ID_START <= key <= TRAP_ID_END]
+
+    default = {trap.name: 1 for trap in traps}
+    valid_keys = sorted({trap.name for trap in traps})
 
     @cached_property
     def weighted_pair(self) -> tuple[list[str], list[int]]:

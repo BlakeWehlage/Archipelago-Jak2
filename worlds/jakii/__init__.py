@@ -9,9 +9,8 @@ from typing import cast, ClassVar, Any
 # Jak 2 imports
 from . import options
 from .game_id import jak2_name, jak2_max
-from .items import (item_table, trap_table,
-                    ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END, TRAP_ID_START,
-                    TRAP_ID_END, Jak2ItemData, Jak2Item, Jak2TrapData, Jak2Trap)
+from .items import (item_table, ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END,
+                    TRAP_ID_START, TRAP_ID_END, Jak2ItemData, Jak2Item)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
 from .locs.mission_locations import Jak2MissionData
@@ -93,22 +92,9 @@ class JakIIWorld(World):
     settings: ClassVar[Jak2Settings]
 
     item_name_to_id = {item_data.name: k for k, item_data in item_table.items()}
-
-    # Add traps with offset so IDs can continue
-    item_name_to_id.update({
-        trap_data.name: ITEM_ID_FILLER_END + trap_id
-        for trap_id, trap_data in trap_table.items()
-    })
-
-    trap_name_to_id = {
-        trap_data.name: ITEM_ID_FILLER_END + trap_id
-        for trap_id, trap_data in trap_table.items()
-    }
-
     location_name_to_id = {data.name: k for k, data in all_locations_table.items()}
     item_name_groups = {
-        "Items": {item.name for item in item_table.values()},
-        "Traps": {trap.name for trap in trap_table.values()}
+        "Items": {item.name for item in item_table.values()}
     }
     location_name_groups = {}
     origin_region_name = "Mission Tree"
@@ -154,7 +140,7 @@ class JakIIWorld(World):
         elif ITEM_ID_FILLER_START <= item <= ITEM_ID_FILLER_END:
             # Filler items (IDs 34-39) (will be made manually)
             data.append((0, ItemClass.filler, 0))
-        elif ITEM_ID_FILLER_END + TRAP_ID_START <= item <= ITEM_ID_FILLER_END + TRAP_ID_END:
+        elif TRAP_ID_START <= item <= TRAP_ID_END:
             # Trap Items (their own table) (will also be made manually)
             data.append((0, ItemClass.trap, 0))
         else:
@@ -172,12 +158,13 @@ class JakIIWorld(World):
 
             data = self.item_data_helper(item_id)
             for (count, classification, num) in data:
-                self.multiworld.itempool += [Jak2Item(item_name, classification, item_id, self.player)
-                                             for _ in range(count)]
+                self.multiworld.itempool += [
+                    Jak2Item(item_name, classification, item_id, self.player)
+                    for _ in range(count)]
                 items_made += 1
 
-            # Skip Traps!
-            if item_name in self.item_name_groups["Traps"]:
+            # Skip traps
+            if TRAP_ID_START <= item_id <= TRAP_ID_END:
                 continue
 
         all_regions = self.multiworld.get_regions(self.player)

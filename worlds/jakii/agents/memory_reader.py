@@ -75,6 +75,9 @@ completion_goal_type_offset = offsets.define(sizeof_uint32)
 completion_goal_value_offset = offsets.define(sizeof_uint32)
 completed_offset = offsets.define(sizeof_uint8)
 
+# Trap Information
+trap_duration_offset = offsets.define(sizeof_float)
+
 # End marker (uint8 array of 4 bytes - "end\0")
 end_marker_offset = offsets.define(sizeof_uint8, 4)
 
@@ -83,52 +86,51 @@ end_marker_offset = offsets.define(sizeof_uint8, 4)
 def as_float(value: int) -> int:
     return int(struct.unpack('f', value.to_bytes(sizeof_float, "little"))[0])
 
-def autopsy(cause: int) -> str:
-    if cause in[1, 2, 3, 4]:
-        return random.choice(["Jak said goodnight.",
-                              "Jak stepped into the light.",
-                              "Jak gave Daxter his insect collection.",
-                              "Jak didn't follow step 1."])
-    if cause == 5:
-        return "Jak couldn't hang with the robots."
-    if cause == 6:
-        return "Jak was turned into an egg!"
-    if cause == 7:
-        return "Jak never found the ground."
-    if cause == 8:
-        return "Jak had a skill issue."
-    if cause == 9:
-        return "Jak hit 2000 degrees."
-    if cause == 10:
-        return "Jak reached their melting point."
-    if cause == 11:
-        return "Jak exploded."
-    if cause == 12:
-        return "Jak exploded big."
-    if cause == 13:
-        return "Jak was gunned down."
-    if cause == 14:
-        return "Jak hit the ground too hard."
-    if cause == 15:
-        return "Jak got hit a little too hard."
-    if cause == 16:
-        return "Jak forgot to wear insulated gloves."
-    if cause == 17:
-        return "Jak was crushed."
-    if cause == 18:
-        return "Jak... is gone. :("
-    if cause == 19:
-        return "Jak exploded :("
-    if cause == 20:
-        return "Jak ran out of air."
-    if cause == 21:
-        return "Jak couldn't handle the heat."
-    if cause == 22:
-        return "Jak was torched."
-    if cause == 23:
-        return "Jak failed the mission."
-    return "Jak died."
-
+#def autopsy(cause: int) -> str:
+#    if cause in[1, 2, 3, 4]:
+#        return random.choice(["Jak said goodnight.",
+#                              "Jak stepped into the light.",
+#                              "Jak gave Daxter his insect collection.",
+#                              "Jak didn't follow step 1."])
+#    if cause == 5:
+#        return "Jak couldn't hang with the robots."
+#    if cause == 6:
+#        return "Jak was turned into an egg!"
+#    if cause == 7:
+#        return "Jak never found the ground."
+#    if cause == 8:
+#        return "Jak had a skill issue."
+#    if cause == 9:
+#        return "Jak hit 2000 degrees."
+#    if cause == 10:
+#        return "Jak reached their melting point."
+#    if cause == 11:
+#        return "Jak exploded."
+#    if cause == 12:
+#        return "Jak exploded big."
+#    if cause == 13:
+#        return "Jak was gunned down."
+#    if cause == 14:
+#        return "Jak hit the ground too hard."
+#    if cause == 15:
+#        return "Jak got hit a little too hard."
+#    if cause == 16:
+#        return "Jak forgot to wear insulated gloves."
+#    if cause == 17:
+#        return "Jak was crushed."
+#    if cause == 18:
+#        return "Jak... is gone. :("
+#    if cause == 19:
+#        return "Jak exploded :("
+#    if cause == 20:
+#        return "Jak ran out of air."
+#    if cause == 21:
+#        return "Jak couldn't handle the heat."
+#    if cause == 22:
+#        return "Jak was torched."
+#    if cause == 23:
+#        return "Jak failed the mission."
+#    return "Jak died."
 
 class Jak2MemoryReader:
     marker: ByteString

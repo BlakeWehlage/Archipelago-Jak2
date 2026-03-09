@@ -15,8 +15,7 @@ import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
 
 from NetUtils import NetworkItem
-from .. import trap_table
-from ..items import item_table, Jak2ItemData
+from ..items import item_table, Jak2ItemData, TRAP_ID_START, TRAP_ID_END
 
 logger = logging.getLogger("Jak2ReplClient")
 
@@ -284,7 +283,7 @@ class Jak2ReplClient:
     async def receive_item(self):
         item = getattr(self.item_inbox[self.inbox_index], "item")
 
-        # Determine the type of item to receive.
+        # Unknown item check
         if item not in item_table:
             self.log_error(logger, f"Tried to receive item with unknown AP ID {item}!")
             return False
@@ -292,50 +291,45 @@ class Jak2ReplClient:
         item_data: Jak2ItemData = item_table[item]
         item_name: str = item_data.name
         item_symbol: str = item_data.symbol
-        ok = await self.send_form(f"(ap-item-received! \'{item_symbol})")
+
+        # Trap handling
+        if TRAP_ID_START <= item <= TRAP_ID_END:
+            ok = await self.send_form(f"(ap-trap-received! '{item_symbol})")
+            if ok:
+                logger.debug(f"Received {item_name}!")
+            else:
+                self.log_error(logger, f"Unable to receive {item_name}!")
+            return ok
+
+        # Normal item handling
+        ok = await self.send_form(f"(ap-item-received! '{item_symbol})")
         if ok:
             logger.debug(f"Received {item_name}!")
         else:
             self.log_error(logger, f"Unable to receive {item_name}!")
+
         return ok
 
-    async def receive_trap(self):
-        trap = getattr(self.item_inbox[self.inbox_index], "trap")
-
-        # Determine the type of trap to receive
-        if trap not in trap_table:
-            self.log_error(logger, f"Tried to receive trap with unknown AP ID {trap}!")
-            return False
-
-        trap_data: Jak2ItemData = trap_table[trap]
-        trap_name: str = trap_data.name
-        trap_symbol: str = trap_data.symbol
-        ok = await self.send_form(f"(ap-trap-received! \'{trap_symbol})")
-        if ok:
-            logger.debug(f"Received {trap_name}!")
-        else:
-            self.log_error(logger, f"Unable to receive {trap_name}!")
-        return ok
     # NOTE: Deathlink is coming later
     # async def receive_deathlink(self) -> bool:
-
+#
         # Because it should be funny sometimes, right?
-        death_types = ["\'death",
-                      "\'death",
-                      "\'death",
-                      "\'death",
-                      "\'endlessfall",
-                      "\'drown-death",
-                      "\'melt",
-                      "\'explode"]
-        chosen_death = random.choice(death_types)
-
-        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
-        if ok:
-            logger.debug(f"Received deathlink signal!")
-        else:
-            self.log_error(logger, f"Unable to receive deathlink signal!")
-        return ok
+#        death_types = ["\'death",
+#                      "\'death",
+#                      "\'death",
+#                      "\'death",
+#                      "\'endlessfall",
+#                      "\'drown-death",
+#                      "\'melt",
+#                      "\'explode"]
+#        chosen_death = random.choice(death_types)
+#
+#        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
+#        if ok:
+#            logger.debug(f"Received deathlink signal!")
+#        else:
+#            self.log_error(logger, f"Unable to receive deathlink signal!")
+#        return ok
 
     # OpenGOAL has a limit of 8 parameters per function. We've already hit this limit. So, define a new datatype
     # in OpenGOAL that holds all these options, instantiate the type here, and have ap-setup-options! function take
@@ -352,7 +346,7 @@ class Jak2ReplClient:
         ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
                                   f":slot-name {sanitized_name} "
                                   f":slot-seed {sanitized_seed} "
-                                  f":trap-duration {trap_time}.0"
+                                  f":trap-duration {trap_time}.0 "
                                   f":completion-type {completion_type} "
                                   f":completion-value {completion_value} ))")
         message = (f"Setting options: \n"
