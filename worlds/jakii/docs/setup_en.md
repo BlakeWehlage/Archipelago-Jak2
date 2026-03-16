@@ -144,4 +144,5 @@ If the client cannot open a REPL (compiler) connection to the game, you may need
 
 ## Known Issues
 
-## Coming Soon!
+- Finishing all Sewer Missions results in the airlock doors going non-functional once in the elevator
+  - For this, you can simply teleport to the hideout and continue as normal
