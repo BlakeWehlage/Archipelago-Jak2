@@ -49,7 +49,7 @@ class TrapEffectDuration(Range):
     display_name = "Trap Effect Duration"
     range_start = 5
     range_end = 60
-    default = 0
+    default = 30
 
 
 class TrapWeights(OptionCounter):
