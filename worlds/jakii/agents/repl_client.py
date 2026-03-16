@@ -48,7 +48,7 @@ class Jak2ReplClient:
     lock: Lock
     connected: bool = False
     initiated_connect: bool = False  # Signals when user tells us to try reconnecting.
-    received_deathlink: bool = False
+    # received_deathlink: bool = False
 
     # Variables to handle the title screen and initial game connection.
     initial_item_count = -1  # Brand new games have 0 items, so initialize this to -1.
@@ -136,9 +136,9 @@ class Jak2ReplClient:
             await self.save_data()
             self.inbox_index += 1
 
-        if self.received_deathlink:
-            await self.receive_deathlink()
-            self.received_deathlink = False
+        # if self.received_deathlink:
+        #     await self.receive_deathlink()
+        #     self.received_deathlink = False
 
         # Progressively empty the queue during each tick
         # if text messages happen to be too slow we could pool dequeuing here,
