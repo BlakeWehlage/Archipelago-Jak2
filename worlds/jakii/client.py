@@ -3,19 +3,19 @@ import asyncio
 import json
 import logging
 import os
+import shlex
 import subprocess
 import sys
 
 from asyncio import Task
 from datetime import datetime
 from logging import Logger
+from shutil import which
 from typing import Awaitable
 
 # Misc imports
 import colorama
-import pymem
-
-from pymem.exception import ProcessNotFound
+from PyMemoryEditor import OpenProcess, ProcessNotFoundError
 
 # Archipelago imports
 import ModuleUpdate
@@ -25,7 +25,7 @@ from CommonClient import ClientCommandProcessor, CommonContext, server_loop, gui
 from NetUtils import ClientStatus
 
 # Jak imports
-from .game_id import jak2_name
+from .game_id import jak2_gk, jak2_goalc, jak2_name
 from .agents.memory_reader import Jak2MemoryReader
 from .agents.repl_client import Jak2ReplClient
 from . import JakIIWorld
@@ -45,6 +45,7 @@ def create_task_log_exception(awaitable: Awaitable) -> asyncio.Task:
             logger.exception(e)
         finally:
             all_tasks.remove(task)
+
     task = asyncio.create_task(_log_exception(awaitable))
     all_tasks.add(task)
     return task
@@ -99,18 +100,17 @@ class Jak2Context(CommonContext):
     slot_seed: str
 
     def __init__(self, server_address: str | None, password: str | None) -> None:
-        self.repl = Jak2ReplClient(self.on_log_error,
-                                   self.on_log_warn,
-                                   self.on_log_success,
-                                   self.on_log_info)
-        self.memr = Jak2MemoryReader(self.on_location_check,
-                                     self.on_finish_check,
-                                     # self.on_deathlink_check,
-                                     # self.on_deathlink_toggle,
-                                     self.on_log_error,
-                                     self.on_log_warn,
-                                     self.on_log_success,
-                                     self.on_log_info)
+        self.repl = Jak2ReplClient(self.on_log_error, self.on_log_warn, self.on_log_success, self.on_log_info)
+        self.memr = Jak2MemoryReader(
+            self.on_location_check,
+            self.on_finish_check,
+            # self.on_deathlink_check,
+            # self.on_deathlink_toggle,
+            self.on_log_error,
+            self.on_log_warn,
+            self.on_log_success,
+            self.on_log_info,
+        )
         # self.repl.load_data()
         # self.memr.load_data()
         super().__init__(server_address, password)
@@ -119,9 +119,7 @@ class Jak2Context(CommonContext):
         from kvui import GameManager
 
         class Jak2Manager(GameManager):
-            logging_pairs = [
-                ("Client", "Archipelago")
-            ]
+            logging_pairs = [("Client", "Archipelago")]
             base_title = "Jak II ArchipelaGOAL Client"
 
         self.ui = Jak2Manager(self)
@@ -161,7 +159,9 @@ class Jak2Context(CommonContext):
                     self.slot_seed[:8],
                     slot_data["trap_effect_duration"],
                     completion_type,
-                    completion_value))
+                    completion_value,
+                )
+            )
 
             # Tell the server if Deathlink is enabled or disabled in-game, allowing us to "remember" the user's choice.
             # self.on_deathlink_toggle()
@@ -252,7 +252,7 @@ class Jak2Context(CommonContext):
     #        await self.send_death(death_text)
     #        self.on_log_warn(logger, death_text)
 
-        # Reset all flags, but leave the death count alone.
+    # Reset all flags, but leave the death count alone.
     #    self.memr.send_deathlink = False
     #    self.memr.cause_of_death = ""
 
@@ -319,21 +319,22 @@ def find_root_directory(ctx: Jak2Context):
 
     # Boilerplate messages that all error messages in this function should have.
     err_title = "Unable to locate the ArchipelaGOAL install directory"
-    alt_instructions = (f"Please verify that OpenGOAL and ArchipelaGOAL are installed properly. "
-                        f"If the problem persists, follow these steps:\n"
-                        f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
-                        f"   Then click Advanced > Open Game Data Folder.\n"
-                        f"   Go up one folder, then copy this path.\n"
-                        f"   Run the Archipelago Launcher, click Open host.yaml.\n"
-                        f"   Set the value of 'jak2_options > root_directory' to this path.\n"
-                        f"   Replace all backslashes in the path with forward slashes.\n"
-                        f"   Set the value of 'jak2_options > auto_detect_root_directory' to false, "
-                        f"then save and close the host.yaml file.\n"
-                        f"   Close all launchers, games, clients, and console windows, then restart Archipelago.")
+    alt_instructions = (
+        f"Please verify that OpenGOAL and ArchipelaGOAL are installed properly. "
+        f"If the problem persists, follow these steps:\n"
+        f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
+        f"   Then click Advanced > Open Game Data Folder.\n"
+        f"   Go up one folder, then copy this path.\n"
+        f"   Run the Archipelago Launcher, click Open host.yaml.\n"
+        f"   Set the value of 'jak2_options > root_directory' to this path.\n"
+        f"   Replace all backslashes in the path with forward slashes.\n"
+        f"   Set the value of 'jak2_options > auto_detect_root_directory' to false, "
+        f"then save and close the host.yaml file.\n"
+        f"   Close all launchers, games, clients, and console windows, then restart Archipelago."
+    )
 
     if not os.path.exists(settings_path):
-        msg = (f"{err_title}: The OpenGOAL settings file does not exist.\n"
-               f"{alt_instructions}")
+        msg = f"{err_title}: The OpenGOAL settings file does not exist.\n" f"{alt_instructions}"
         ctx.on_log_error(logger, msg)
         return
 
@@ -347,8 +348,7 @@ def find_root_directory(ctx: Jak2Context):
             settings_version = load["version"]
             logger.debug(f"OpenGOAL settings file version: {settings_version}")
         except KeyError:
-            msg = (f"{err_title}: The OpenGOAL settings file has no version number!\n"
-                   f"{alt_instructions}")
+            msg = f"{err_title}: The OpenGOAL settings file has no version number!\n" f"{alt_instructions}"
             ctx.on_log_error(logger, msg)
             return
 
@@ -360,25 +360,24 @@ def find_root_directory(ctx: Jak2Context):
                 jak2_installed = load["games"]["jak2"]["isInstalled"]
                 mod_sources = load["games"]["jak2"]["mods"]
             else:
-                msg = (f"{err_title}: The OpenGOAL settings file has an unknown version number ({settings_version}).\n"
-                       f"{alt_instructions}")
+                msg = (
+                    f"{err_title}: The OpenGOAL settings file has an unknown version number ({settings_version}).\n"
+                    f"{alt_instructions}"
+                )
                 ctx.on_log_error(logger, msg)
                 return
         except KeyError as e:
-            msg = (f"{err_title}: The OpenGOAL settings file does not contain key entry {e}!\n"
-                   f"{alt_instructions}")
+            msg = f"{err_title}: The OpenGOAL settings file does not contain key entry {e}!\n" f"{alt_instructions}"
             ctx.on_log_error(logger, msg)
             return
 
         if not jak2_installed:
-            msg = (f"{err_title}: The OpenGOAL Launcher is missing a normal install of Jak 2!\n"
-                   f"{alt_instructions}")
+            msg = f"{err_title}: The OpenGOAL Launcher is missing a normal install of Jak 2!\n" f"{alt_instructions}"
             ctx.on_log_error(logger, msg)
             return
 
         if mod_sources is None:
-            msg = (f"{err_title}: No mod sources have been configured in the OpenGOAL Launcher!\n"
-                   f"{alt_instructions}")
+            msg = f"{err_title}: No mod sources have been configured in the OpenGOAL Launcher!\n" f"{alt_instructions}"
             ctx.on_log_error(logger, msg)
             return
 
@@ -391,18 +390,16 @@ def find_root_directory(ctx: Jak2Context):
                     archipelagoal_source = src
                     # Using this file, we could verify the right version is installed, but we don't need to.
         if archipelagoal_source is None:
-            msg = (f"{err_title}: The ArchipelaGOAL mod is not installed in the OpenGOAL Launcher!\n"
-                   f"{alt_instructions}")
+            msg = (
+                f"{err_title}: The ArchipelaGOAL mod is not installed in the OpenGOAL Launcher!\n" f"{alt_instructions}"
+            )
             ctx.on_log_error(logger, msg)
             return
 
         # This is just the base OpenGOAL directory, we need to go deeper.
         base_path = load["installationDir"]
         mod_relative_path = f"features/jak2/mods/{archipelagoal_source}/archipelagoal-2"
-        mod_path = os.path.normpath(
-            os.path.join(
-                os.path.normpath(base_path),
-                os.path.normpath(mod_relative_path)))
+        mod_path = os.path.normpath(os.path.join(os.path.normpath(base_path), os.path.normpath(mod_relative_path)))
 
     return mod_path
 
@@ -410,19 +407,18 @@ def find_root_directory(ctx: Jak2Context):
 async def run_game(ctx: Jak2Context):
 
     # These may already be running. If they are not running, try to start them.
-    # TODO - Support other OS's. 1: Pymem is Windows-only. 2: on Linux, there's no ".exe."
     gk_running = False
     try:
-        pymem.Pymem("gk.exe")  # The GOAL Kernel
+        OpenProcess(process_name=jak2_gk)  # The GOAL Kernel
         gk_running = True
-    except ProcessNotFound:
+    except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Game not running, attempting to start.")
 
     goalc_running = False
     try:
-        pymem.Pymem("goalc.exe")  # The GOAL Compiler and REPL
+        OpenProcess(process_name=jak2_goalc)  # The GOAL Compiler and REPL
         goalc_running = True
-    except ProcessNotFound:
+    except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Compiler not running, attempting to start.")
 
     try:
@@ -435,35 +431,41 @@ async def run_game(ctx: Jak2Context):
             # Always trust your instincts... the user may not have entered their root_directory properly.
             # We don't have to do this check if the root directory was auto-detected.
             if "/" not in root_path:
-                msg = (f"The ArchipelaGOAL root directory contains no path. (Are you missing forward slashes?)\n"
-                       f"Please check your host.yaml file.\n"
-                       f"Verify the value of 'jak2_options > root_directory' is a valid existing path, "
-                       f"and all backslashes have been replaced with forward slashes.")
+                msg = (
+                    f"The ArchipelaGOAL root directory contains no path. (Are you missing forward slashes?)\n"
+                    f"Please check your host.yaml file.\n"
+                    f"Verify the value of 'jak2_options > root_directory' is a valid existing path, "
+                    f"and all backslashes have been replaced with forward slashes."
+                )
                 ctx.on_log_error(logger, msg)
                 return
 
         # Start by checking the existence of the root directory provided in the host.yaml file (or found automatically).
         root_path = os.path.normpath(root_path)
         if not os.path.exists(root_path):
-            msg = (f"The ArchipelaGOAL root directory does not exist, unable to locate the Game and Compiler.\n"
-                   f"Please check your host.yaml file.\n"
-                   f"If the value of 'jak2_options > auto_detect_root_directory' is true, verify that OpenGOAL "
-                   f"is installed properly.\n"
-                   f"If it is false, check the value of 'jak2_options > root_directory'. "
-                   f"Verify it is a valid existing path, and all backslashes have been replaced with forward slashes.")
+            msg = (
+                f"The ArchipelaGOAL root directory does not exist, unable to locate the Game and Compiler.\n"
+                f"Please check your host.yaml file.\n"
+                f"If the value of 'jak2_options > auto_detect_root_directory' is true, verify that OpenGOAL "
+                f"is installed properly.\n"
+                f"If it is false, check the value of 'jak2_options > root_directory'. "
+                f"Verify it is a valid existing path, and all backslashes have been replaced with forward slashes."
+            )
             ctx.on_log_error(logger, msg)
             return
 
         # Now double-check the existence of the two executables we need.
-        gk_path = os.path.join(root_path, "gk.exe")
-        goalc_path = os.path.join(root_path, "goalc.exe")
+        gk_path = os.path.join(root_path, jak2_gk)
+        goalc_path = os.path.join(root_path, jak2_goalc)
         if not os.path.exists(gk_path) or not os.path.exists(goalc_path):
-            msg = (f"The Game and Compiler could not be found in the ArchipelaGOAL root directory.\n"
-                   f"Please check your host.yaml file.\n"
-                   f"If the value of 'jak2_options > auto_detect_root_directory' is true, verify that OpenGOAL "
-                   f"is installed properly.\n"
-                   f"If it is false, check the value of 'jak2_options > root_directory'. "
-                   f"Verify it is a valid existing path, and all backslashes have been replaced with forward slashes.")
+            msg = (
+                f"The Game and Compiler could not be found in the ArchipelaGOAL root directory.\n"
+                f"Please check your host.yaml file.\n"
+                f"If the value of 'jak2_options > auto_detect_root_directory' is true, verify that OpenGOAL "
+                f"is installed properly.\n"
+                f"If it is false, check the value of 'jak2_options > root_directory'. "
+                f"Verify it is a valid existing path, and all backslashes have been replaced with forward slashes."
+            )
             ctx.on_log_error(logger, msg)
             return
 
@@ -473,10 +475,7 @@ async def run_game(ctx: Jak2Context):
             # a relative path, normalize it, and pass it in as an argument to gk. This folder will be created if
             # it does not exist.
             config_relative_path = "../_settings/archipelagoal-2"
-            config_path = os.path.normpath(
-                os.path.join(
-                    root_path,
-                    os.path.normpath(config_relative_path)))
+            config_path = os.path.normpath(os.path.join(root_path, os.path.normpath(config_relative_path)))
 
             # The game freezes if text is inadvertently selected in the stdout/stderr data streams. Let's pipe those
             # streams to a file, and let's not clutter the screen with another console window.
@@ -484,13 +483,27 @@ async def run_game(ctx: Jak2Context):
             log_path = os.path.join(Utils.user_path("logs"), f"Jak2Game_{timestamp}.txt")
             log_path = os.path.normpath(log_path)
             with open(log_path, "w") as log_file:
-                gk_process = subprocess.Popen(
-                    [gk_path, "--game", "jak2",
-                     "--config-path", config_path,
-                     "--", "-v", "-boot", "-fakeiso", "-debug"],
-                    stdout=log_file,
-                    stderr=log_file,
-                    creationflags=subprocess.CREATE_NO_WINDOW)
+                gk_args = [
+                    gk_path,
+                    "--game",
+                    "jak2",
+                    "--config-path",
+                    config_path,
+                    "--",
+                    "-v",
+                    "-boot",
+                    "-fakeiso",
+                    "-debug",
+                ]
+                if Utils.is_windows:
+                    gk_process = subprocess.Popen(
+                        gk_args,
+                        stdout=log_file,
+                        stderr=log_file,
+                        creationflags=subprocess.CREATE_NO_WINDOW,
+                    )
+                else:
+                    gk_process = subprocess.Popen(gk_args, stdout=log_file, stderr=log_file)
 
         if not goalc_running:
             # For the OpenGOAL Compiler, the existence of the "data" subfolder indicates you are running it from
@@ -507,10 +520,7 @@ async def run_game(ctx: Jak2Context):
                 }
 
                 for iso_relative_path in possible_relative_paths:
-                    iso_path = os.path.normpath(
-                        os.path.join(
-                            root_path,
-                            os.path.normpath(iso_relative_path)))
+                    iso_path = os.path.normpath(os.path.join(root_path, os.path.normpath(iso_relative_path)))
 
                     if os.path.exists(iso_path):
                         goalc_args = [goalc_path, "--game", "jak2", "--proj-path", proj_path, "--iso-path", iso_path]
@@ -520,16 +530,18 @@ async def run_game(ctx: Jak2Context):
                         logger.debug(f"iso_data folder not found, continuing: {iso_path}")
 
                 if not goalc_args:
-                    msg = (f"The iso_data folder could not be found.\n"
-                           f"Please follow these steps:\n"
-                           f"   Run the OpenGOAL Launcher, click Jak II > Advanced > Open Game Data Folder.\n"
-                           f"   Copy the iso_data folder from this location.\n"
-                           f"   Click Jak II > Features > Mods > ArchipelaGOAL > Advanced > "
-                           f"Open Game Data Folder.\n"
-                           f"   Paste the iso_data folder in this location.\n"
-                           f"   Click Advanced > Compile. When this is done, click Continue.\n"
-                           f"   Close all launchers, games, clients, and console windows, then restart Archipelago.\n"
-                           f"(See Setup Guide for more details.)")
+                    msg = (
+                        f"The iso_data folder could not be found.\n"
+                        f"Please follow these steps:\n"
+                        f"   Run the OpenGOAL Launcher, click Jak II > Advanced > Open Game Data Folder.\n"
+                        f"   Copy the iso_data folder from this location.\n"
+                        f"   Click Jak II > Features > Mods > ArchipelaGOAL > Advanced > "
+                        f"Open Game Data Folder.\n"
+                        f"   Paste the iso_data folder in this location.\n"
+                        f"   Click Advanced > Compile. When this is done, click Continue.\n"
+                        f"   Close all launchers, games, clients, and console windows, then restart Archipelago.\n"
+                        f"(See Setup Guide for more details.)"
+                    )
                     ctx.on_log_error(logger, msg)
                     return
 
@@ -540,23 +552,53 @@ async def run_game(ctx: Jak2Context):
                 goalc_args = [goalc_path, "--game", "jak2"]
 
             # This needs to be a new console. The REPL console cannot share a window with any other process.
-            goalc_process = subprocess.Popen(goalc_args, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            if Utils.is_windows:
+                goalc_process = subprocess.Popen(goalc_args, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            elif Utils.is_linux:
+                terminal = which("x-terminal-emulator") or which("gnome-terminal") or which("konsole") or which("xterm")
+
+                # Don't allow the terminal application to attempt loading system libraries, this can cause OpenSSL
+                # errors when launching the REPL due to version mismatches between system vs shipped libraries.
+                env = os.environ
+                if "LD_LIBRARY_PATH" in env:
+                    env = env.copy()
+                    del env["LD_LIBRARY_PATH"]
+
+                if terminal:
+                    goalc_process = subprocess.Popen([terminal, "-e", shlex.join(goalc_args)], env=env)
+                else:
+                    msg = (
+                        f"Your Linux installation does not have a supported terminal application.\n"
+                        f"We support the following options:\n"
+                        f"   x-terminal-emulator\n"
+                        f"   gnome-terminal\n"
+                        f"   konsole\n"
+                        f"   xterm\n"
+                        f"Please install one of these and try again."
+                    )
+                    ctx.on_log_error(logger, msg)
+                    return
+
+            elif Utils.is_macos:
+                terminal = [which("open"), "-W", "-a", "Terminal.app"]
+                goalc_process = subprocess.Popen([*terminal, *goalc_args])
 
     except AttributeError as e:
         if " " in e.args[0]:
             # YAML keys in Host.yaml ought to contain no spaces, which means this is a much more important error.
             ctx.on_log_error(logger, e.args[0])
         else:
-            ctx.on_log_error(logger,
-                             f"Host.yaml does not contain {e.args[0]}, unable to locate game executables.")
+            ctx.on_log_error(logger, f"Host.yaml does not contain {e.args[0]}, unable to locate game executables.")
         return
     except FileNotFoundError as e:
-        msg = (f"The following path could not be found: {e.filename}\n"
-               f"Please check your host.yaml file.\n"
-               f"If the value of 'jak2_options > auto_detect_root_directory' is true, verify that OpenGOAL "
-               f"is installed properly.\n"
-               f"If it is false, check the value of 'jak2_options > root_directory'."
-               f"Verify it is a valid existing path, and all backslashes have been replaced with forward slashes.")
+        msg = (
+            f"The following path could not be found: {e.filename}\n"
+            f"Please check your host.yaml file.\n"
+            f"If the value of 'jak2_options > auto_detect_root_directory' is true, verify that OpenGOAL "
+            f"is installed properly.\n"
+            f"If it is false, check the value of 'jak2_options > root_directory'."
+            f"Verify it is a valid existing path, and all backslashes have been replaced with forward slashes."
+        )
         ctx.on_log_error(logger, msg)
         return
 

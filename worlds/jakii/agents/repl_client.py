@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-import pymem
-from pymem.exception import ProcessNotFound, ProcessError
+from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
 
 from NetUtils import NetworkItem
 from ..items import item_table, Jak2ItemData, TRAP_ID_START, TRAP_ID_END
+from worlds.jakii.game_id import jak2_gk, jak2_goalc
 
 logger = logging.getLogger("Jak2ReplClient")
 
@@ -28,16 +28,86 @@ class JsonMessageData:
     their_item_owner: str | None = None
 
 
-ALLOWED_CHARACTERS = frozenset({
-    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
-    "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
-    "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d",
-    "e", "f", "g", "h", "i", "j", "k", "l", "m", "n",
-    "o", "p", "q", "r", "s", "t", "u", "v", "w", "x",
-    "y", "z", " ", "!", ":", ",", ".", "/", "?", "-",
-    "=", "+", "'", "(", ")", "\""
-})
+ALLOWED_CHARACTERS = frozenset(
+    {
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h",
+        "i",
+        "j",
+        "k",
+        "l",
+        "m",
+        "n",
+        "o",
+        "p",
+        "q",
+        "r",
+        "s",
+        "t",
+        "u",
+        "v",
+        "w",
+        "x",
+        "y",
+        "z",
+        " ",
+        "!",
+        ":",
+        ",",
+        ".",
+        "/",
+        "?",
+        "-",
+        "=",
+        "+",
+        "'",
+        "(",
+        ")",
+        '"',
+    }
+)
 
 
 class Jak2ReplClient:
@@ -57,8 +127,8 @@ class Jak2ReplClient:
 
     # The REPL client needs the REPL/compiler process running, but that process
     # also needs the game running. Therefore, the REPL client needs both running.
-    gk_process: pymem.process = None
-    goalc_process: pymem.process = None
+    gk_process: OpenProcess | None = None
+    goalc_process: OpenProcess | None = None
 
     item_inbox: dict[int, NetworkItem] = {}
     inbox_index = 0
@@ -66,18 +136,20 @@ class Jak2ReplClient:
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
-    log_error: Callable    # Red
-    log_warn: Callable     # Orange
+    log_error: Callable  # Red
+    log_warn: Callable  # Orange
     log_success: Callable  # Green
-    log_info: Callable     # White (default)
+    log_info: Callable  # White (default)
 
-    def __init__(self,
-                 log_error_callback: Callable,
-                 log_warn_callback: Callable,
-                 log_success_callback: Callable,
-                 log_info_callback: Callable,
-                 ip: str = "127.0.0.1",
-                 port: int = 8181):
+    def __init__(
+        self,
+        log_error_callback: Callable,
+        log_warn_callback: Callable,
+        log_success_callback: Callable,
+        log_info_callback: Callable,
+        ip: str = "127.0.0.1",
+        port: int = 8181,
+    ):
         self.ip = ip
         self.port = port
         self.lock = asyncio.Lock()
@@ -93,29 +165,35 @@ class Jak2ReplClient:
 
         if self.connected:
             try:
-                self.gk_process.read_bool(self.gk_process.base_address)  # Ping to see if it's alive.
-            except ProcessError:
-                msg = (f"Error reading game memory! (Did the game crash?)\n"
-                       f"Please close all open windows and reopen the Jak II Client "
-                       f"from the Archipelago Launcher.\n"
-                       f"If the game and compiler do not restart automatically, please follow these steps:\n"
-                       f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
-                       f"   Then click Advanced > Play in Debug Mode.\n"
-                       f"   Then click Advanced > Open REPL.\n"
-                       f"   Then close and reopen the Jak II Client from the Archipelago Launcher.")
+                # self.gk_process.read_bool(self.gk_process.base_address)  # Ping to see if it's alive.
+                OpenProcess(process_name=jak2_gk)
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                msg = (
+                    f"Error reading game memory! (Did the game crash?)\n"
+                    f"Please close all open windows and reopen the Jak II Client "
+                    f"from the Archipelago Launcher.\n"
+                    f"If the game and compiler do not restart automatically, please follow these steps:\n"
+                    f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
+                    f"   Then click Advanced > Play in Debug Mode.\n"
+                    f"   Then click Advanced > Open REPL.\n"
+                    f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
+                )
                 self.log_error(logger, msg)
                 self.connected = False
             try:
-                self.goalc_process.read_bool(self.goalc_process.base_address)  # Ping to see if it's alive.
-            except ProcessError:
-                msg = (f"Error sending data to compiler! (Did the compiler crash?)\n"
-                       f"Please close all open windows and reopen the Jak II Client "
-                       f"from the Archipelago Launcher.\n"
-                       f"If the game and compiler do not restart automatically, please follow these steps:\n"
-                       f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
-                       f"   Then click Advanced > Play in Debug Mode.\n"
-                       f"   Then click Advanced > Open REPL.\n"
-                       f"   Then close and reopen the Jak II Client from the Archipelago Launcher.")
+                # self.goalc_process.read_bool(self.goalc_process.base_address)  # Ping to see if it's alive.
+                OpenProcess(process_name=jak2_goalc)
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                msg = (
+                    f"Error sending data to compiler! (Did the compiler crash?)\n"
+                    f"Please close all open windows and reopen the Jak II Client "
+                    f"from the Archipelago Launcher.\n"
+                    f"If the game and compiler do not restart automatically, please follow these steps:\n"
+                    f"   Run the OpenGOAL Launcher, click Jak II > Features > Mods > ArchipelaGOAL.\n"
+                    f"   Then click Advanced > Play in Debug Mode.\n"
+                    f"   Then click Advanced > Open REPL.\n"
+                    f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
+                )
                 self.log_error(logger, msg)
                 self.connected = False
         else:
@@ -168,16 +246,16 @@ class Jak2ReplClient:
 
     async def connect(self):
         try:
-            self.gk_process = pymem.Pymem("gk.exe")  # The GOAL Kernel
-            logger.debug("Found the gk process: " + str(self.gk_process.process_id))
-        except ProcessNotFound:
+            self.gk_process = OpenProcess(process_name=jak2_gk)  # The GOAL Kernel
+            logger.debug("Found the gk process: " + str(self.gk_process.pid))
+        except ProcessNotFoundError:
             self.log_error(logger, "Could not find the game process.")
             return
 
         try:
-            self.goalc_process = pymem.Pymem("goalc.exe")  # The GOAL Compiler and REPL
-            logger.debug("Found the goalc process: " + str(self.goalc_process.process_id))
-        except ProcessNotFound:
+            self.goalc_process = OpenProcess(process_name=jak2_goalc)  # The GOAL Compiler and REPL
+            logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
+        except ProcessNotFoundError:
             self.log_error(logger, "Could not find the compiler process.")
             return
 
@@ -191,8 +269,9 @@ class Jak2ReplClient:
             if "Connected to OpenGOAL" and "nREPL!" in welcome_message:
                 logger.debug(welcome_message)
             else:
-                self.log_error(logger,
-                               f"Unable to connect to REPL websocket: unexpected welcome message \"{welcome_message}\"")
+                self.log_error(
+                    logger, f'Unable to connect to REPL websocket: unexpected welcome message "{welcome_message}"'
+                )
         except ConnectionRefusedError as e:
             self.log_error(logger, f"Unable to connect to REPL websocket: {e.strerror}")
             return
@@ -207,7 +286,7 @@ class Jak2ReplClient:
                 ("Compile the game", "(mi)"),
                 # ("Set debug flag to off", "(set! *debug-segment* #f)"),
                 ("Set cheat mode to off", "(set! *cheat-mode* #f)"),
-                ("Run the title screen", "(start \'play (get-continue-by-name *game-info* \"title-start\"))"),
+                ("Run the title screen", '(start \'play (get-continue-by-name *game-info* "title-start"))'),
             ]
             for step, command in steps_to_run:
                 self.log_info(logger, f"[{current_step}/{len(steps_to_run)}] {step}...")
@@ -226,9 +305,7 @@ class Jak2ReplClient:
     async def print_status(self):
         gc_proc_id = str(self.goalc_process.process_id) if self.goalc_process else "None"
         gk_proc_id = str(self.gk_process.process_id) if self.gk_process else "None"
-        msg = (f"REPL Status:\n"
-               f"   REPL process ID: {gc_proc_id}\n"
-               f"   Game process ID: {gk_proc_id}\n")
+        msg = f"REPL Status:\n" f"   REPL process ID: {gc_proc_id}\n" f"   Game process ID: {gk_proc_id}\n"
         try:
             if self.reader and self.writer:
                 addr = self.writer.get_extra_info("peername")
@@ -250,15 +327,15 @@ class Jak2ReplClient:
     def sanitize_game_text(text: str) -> str:
         result = "".join([c if c in ALLOWED_CHARACTERS else "?" for c in text[:32]]).upper()
         result = result.replace("'", "\\c12")
-        return f"\"{result}\""
+        return f'"{result}"'
 
     # Like sanitize_game_text, but the settings file will NOT allow any whitespace in the slot_name or slot_seed data.
     # And don't replace any chars with "?" for good measure.
     @staticmethod
     def sanitize_file_text(text: str) -> str:
-        allowed_chars_no_extras = ALLOWED_CHARACTERS - {" ", "'", "(", ")", "\""}
+        allowed_chars_no_extras = ALLOWED_CHARACTERS - {" ", "'", "(", ")", '"'}
         result = "".join([c if c in allowed_chars_no_extras else "" for c in text[:16]]).upper()
-        return f"\"{result}\""
+        return f'"{result}"'
 
     # Pushes a JsonMessageData object to the json message queue to be processed during the repl main_tick
     def queue_game_text(self, my_item_name, my_item_finder, their_item_name, their_item_owner):
@@ -271,13 +348,17 @@ class Jak2ReplClient:
         logger.debug(f"Sending info to the in-game messenger!")
         body = ""
         if data.my_item_name and data.my_item_finder:
-            body += (f" (append-messages (-> *ap-messenger* 0) \'recv "
-                     f" {self.sanitize_game_text(data.my_item_name)} "
-                     f" {self.sanitize_game_text(data.my_item_finder)})")
+            body += (
+                f" (append-messages (-> *ap-messenger* 0) 'recv "
+                f" {self.sanitize_game_text(data.my_item_name)} "
+                f" {self.sanitize_game_text(data.my_item_finder)})"
+            )
         if data.their_item_name and data.their_item_owner:
-            body += (f" (append-messages (-> *ap-messenger* 0) \'sent "
-                     f" {self.sanitize_game_text(data.their_item_name)} "
-                     f" {self.sanitize_game_text(data.their_item_owner)})")
+            body += (
+                f" (append-messages (-> *ap-messenger* 0) 'sent "
+                f" {self.sanitize_game_text(data.their_item_name)} "
+                f" {self.sanitize_game_text(data.their_item_owner)})"
+            )
         await self.send_form(f"(begin {body} (none))", print_ok=False)
 
     async def receive_item(self):
@@ -312,49 +393,50 @@ class Jak2ReplClient:
 
     # NOTE: Deathlink is coming later
     # async def receive_deathlink(self) -> bool:
-#
-        # Because it should be funny sometimes, right?
-#        death_types = ["\'death",
-#                      "\'death",
-#                      "\'death",
-#                      "\'death",
-#                      "\'endlessfall",
-#                      "\'drown-death",
-#                      "\'melt",
-#                      "\'explode"]
-#        chosen_death = random.choice(death_types)
-#
-#        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
-#        if ok:
-#            logger.debug(f"Received deathlink signal!")
-#        else:
-#            self.log_error(logger, f"Unable to receive deathlink signal!")
-#        return ok
+    #
+    # Because it should be funny sometimes, right?
+    #        death_types = ["\'death",
+    #                      "\'death",
+    #                      "\'death",
+    #                      "\'death",
+    #                      "\'endlessfall",
+    #                      "\'drown-death",
+    #                      "\'melt",
+    #                      "\'explode"]
+    #        chosen_death = random.choice(death_types)
+    #
+    #        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
+    #        if ok:
+    #            logger.debug(f"Received deathlink signal!")
+    #        else:
+    #            self.log_error(logger, f"Unable to receive deathlink signal!")
+    #        return ok
 
     # OpenGOAL has a limit of 8 parameters per function. We've already hit this limit. So, define a new datatype
     # in OpenGOAL that holds all these options, instantiate the type here, and have ap-setup-options! function take
     # that instance as input.
-    async def setup_options(self,
-                            slot_name: str,
-                            slot_seed: str,
-                            trap_time: int,
-                            completion_type: int,
-                            completion_value: int) -> bool:
+    async def setup_options(
+        self, slot_name: str, slot_seed: str, trap_time: int, completion_type: int, completion_value: int
+    ) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
-        ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
-                                  f":slot-name {sanitized_name} "
-                                  f":slot-seed {sanitized_seed} "
-                                  f":trap-duration {trap_time}.0 "
-                                  f":completion-type {completion_type} "
-                                  f":completion-value {completion_value} ))")
-        message = (f"Setting options: \n"
-                   f"   Slot Name {sanitized_name}, \n"
-                   f"   Slot Seed {sanitized_seed}, \n"
-                   f"   Trap Duration {trap_time}, \n"
-                   f"   Goal Type {completion_type}, \n"
-                   f"   Goal Value {completion_value}... ")
+        ok = await self.send_form(
+            f"(ap-setup-options! (new 'static 'ap-seed-options "
+            f":slot-name {sanitized_name} "
+            f":slot-seed {sanitized_seed} "
+            f":trap-duration {trap_time}.0 "
+            f":completion-type {completion_type} "
+            f":completion-value {completion_value} ))"
+        )
+        message = (
+            f"Setting options: \n"
+            f"   Slot Name {sanitized_name}, \n"
+            f"   Slot Seed {sanitized_seed}, \n"
+            f"   Trap Duration {trap_time}, \n"
+            f"   Goal Type {completion_type}, \n"
+            f"   Goal Value {completion_value}... "
+        )
         if ok:
             logger.debug(message + "Success!")
         else:
@@ -373,13 +455,15 @@ class Jak2ReplClient:
         with open("jakii_item_inbox.json", "w+") as f:
             dump = {
                 "inbox_index": self.inbox_index,
-                "item_inbox": [{
-                    "item": self.item_inbox[k].item,
-                    "location": self.item_inbox[k].location,
-                    "player": self.item_inbox[k].player,
-                    "flags": self.item_inbox[k].flags
-                    } for k in self.item_inbox
-                ]
+                "item_inbox": [
+                    {
+                        "item": self.item_inbox[k].item,
+                        "location": self.item_inbox[k].location,
+                        "player": self.item_inbox[k].player,
+                        "flags": self.item_inbox[k].flags,
+                    }
+                    for k in self.item_inbox
+                ],
             }
             json.dump(dump, f, indent=4)
 
@@ -388,12 +472,14 @@ class Jak2ReplClient:
             with open("jakii_item_inbox.json", "r") as f:
                 load = json.load(f)
                 self.inbox_index = load["inbox_index"]
-                self.item_inbox = {k: NetworkItem(
+                self.item_inbox = {
+                    k: NetworkItem(
                         item=load["item_inbox"][k]["item"],
                         location=load["item_inbox"][k]["location"],
                         player=load["item_inbox"][k]["player"],
-                        flags=load["item_inbox"][k]["flags"]
-                    ) for k in range(0, len(load["item_inbox"]))
+                        flags=load["item_inbox"][k]["flags"],
+                    )
+                    for k in range(0, len(load["item_inbox"]))
                 }
         except FileNotFoundError:
             pass
