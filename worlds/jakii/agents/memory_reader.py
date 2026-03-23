@@ -3,6 +3,7 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
+from psutil import NoSuchProcess
 from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
 from dataclasses import dataclass
 
@@ -200,7 +201,7 @@ class Jak2MemoryReader:
             try:
                 # self.gk_process.read_bool(self.gk_process.base_address)  # Ping to see if it's alive.
                 OpenProcess(process_name=jak2_gk)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess, NoSuchProcess):
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -289,7 +290,7 @@ class Jak2MemoryReader:
                 self.connected = True
             else:
                 raise Exception(memory_version_offset, sizeof_uint32)
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess, Exception) as e:
+        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess, NoSuchProcess, Exception) as e:
             if memory_version is None:
                 msg = (
                     f"Could not find a version number in the OpenGOAL memory structure!\n"
@@ -391,7 +392,7 @@ class Jak2MemoryReader:
             # deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
             # self.deathlink_enabled = bool(deathlink_flag)
 
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess, NoSuchProcess):
             msg = (
                 f"Error reading game memory! (Did the game crash?)\n"
                 f"Please close all open windows and reopen the Jak II Client "
