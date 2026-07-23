@@ -1,4 +1,6 @@
 # Archipelago Imports
+import math
+
 import settings
 from Options import OptionError, OptionGroup
 from worlds.AutoWorld import World, WebWorld
@@ -119,12 +121,10 @@ class JakIIWorld(World):
             raise OptionError(f"Unknown completion condition selected for Jak II: {self.completion_type}")
 
         # Calculate Filler and Traps, if applicable
-        if self.options.percent_filler_replaced_with_traps > 0:
-            self.total_trap_items = (
-                int((
-                    self.options.percent_filler_replaced_with_traps / 100) * (self.total_items - self.total_prog_items))
-                )
-            self.total_filler_items = self.total_items - self.total_prog_items - self.total_trap_items
+        available_slots = self.total_items - self.total_prog_items
+        trap_replace_percent = self.options.percent_filler_replaced_with_traps / 100
+        self.total_trap_items = math.floor(available_slots * trap_replace_percent)
+        self.total_filler_items = available_slots - self.total_trap_items
 
         self.trap_weights = self.options.trap_weights.weighted_pair
 
