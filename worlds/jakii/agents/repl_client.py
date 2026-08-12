@@ -77,7 +77,6 @@ class Jak2ReplClient:
                  log_warn_callback: Callable,
                  log_success_callback: Callable,
                  log_info_callback: Callable,
-                 memr,
                  ip: str = "127.0.0.1",
                  port: int = 8181):
         self.ip = ip
@@ -87,7 +86,6 @@ class Jak2ReplClient:
         self.log_warn = log_warn_callback
         self.log_success = log_success_callback
         self.log_info = log_info_callback
-        self.memr = memr
 
     async def main_tick(self):
         if self.initiated_connect:
@@ -357,7 +355,7 @@ class Jak2ReplClient:
                       "'big-explosion"]
         chosen_death = random.choice(death_types)
 
-        ok = await self.send_form("(ap-deathlink-received! {chosen_death})")
+        ok = await self.send_form(f"(ap-deathlink-received! {chosen_death})")
         if ok:
             logger.debug(f"Received deathlink signal!")
         else:

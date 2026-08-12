@@ -50,11 +50,6 @@ class OffsetFactory:
 # the same lengths, as defined in `ap-info-jak2`.
 offsets = OffsetFactory()
 
-# Deathlink Information
-death_count_offset = offsets.define(sizeof_uint32)
-death_cause_offset = offsets.define(sizeof_uint8)
-deathlink_enabled_offset = offsets.define(sizeof_uint8)
-
 # Memory version (uint32 in GOAL)
 memory_version_offset = offsets.define(sizeof_uint32)
 
@@ -74,6 +69,11 @@ connection_status_offset = offsets.define(sizeof_uint32)  # ap-connection-status
 completion_goal_type_offset = offsets.define(sizeof_uint32)
 completion_goal_value_offset = offsets.define(sizeof_uint32)
 completed_offset = offsets.define(sizeof_uint8)
+
+# Deathlink Information
+death_count_offset = offsets.define(sizeof_uint32)
+death_cause_offset = offsets.define(sizeof_uint8)
+deathlink_enabled_offset = offsets.define(sizeof_uint8)
 
 # Trap Information
 trap_duration_offset = offsets.define(sizeof_float)
@@ -180,7 +180,6 @@ class Jak2MemoryReader:
         self.inform_finished_game = finish_game_callback
         self.inform_died = send_deathlink_callback
         self.inform_toggled_deathlink = toggle_deathlink_callback
-
         self.log_error = log_error_callback
         self.log_warn = log_warn_callback
         self.log_success = log_success_callback
