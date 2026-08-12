@@ -48,7 +48,7 @@ class Jak2ReplClient:
     lock: Lock
     connected: bool = False
     initiated_connect: bool = False  # Signals when user tells us to try reconnecting.
-    # received_deathlink: bool = False
+    received_deathlink: bool = False
 
     # Variables to handle the title screen and initial game connection.
     initial_item_count = -1  # Brand new games have 0 items, so initialize this to -1.
@@ -149,9 +149,9 @@ class Jak2ReplClient:
         if self.is_replaying and self.inbox_index >= len(self.item_inbox):
             self.is_replaying = False
 
-        # if self.received_deathlink:
-        #     await self.receive_deathlink()
-        #     self.received_deathlink = False
+        if self.received_deathlink:
+            await self.receive_deathlink()
+            self.received_deathlink = False
 
         # Progressively empty the queue during each tick
         # if text messages happen to be too slow we could pool dequeuing here,
@@ -338,26 +338,31 @@ class Jak2ReplClient:
 
         return ok
 
-    # NOTE: Deathlink is coming later
-    # async def receive_deathlink(self) -> bool:
-#
+
+    async def receive_deathlink(self) -> bool:
+
         # Because it should be funny sometimes, right?
-#        death_types = ["\'death",
-#                      "\'death",
-#                      "\'death",
-#                      "\'death",
-#                      "\'endlessfall",
-#                      "\'drown-death",
-#                      "\'melt",
-#                      "\'explode"]
-#        chosen_death = random.choice(death_types)
-#
-#        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
-#        if ok:
-#            logger.debug(f"Received deathlink signal!")
-#        else:
-#            self.log_error(logger, f"Unable to receive deathlink signal!")
-#        return ok
+        death_types = ["'death",
+                      "'death",
+                      "'death",
+                      "'death",
+                      "'endlessfall",
+                      "'dark-eco-pool",
+                      "'crush",
+                      "'smush",
+                      "'drown-death",
+                      "'lava",
+                      "'grenade",
+                      "'explode",
+                      "'big-explosion"]
+        chosen_death = random.choice(death_types)
+
+        ok = await self.send_form("(ap-deathlink-received! {chosen_death})")
+        if ok:
+            logger.debug(f"Received deathlink signal!")
+        else:
+            self.log_error(logger, f"Unable to receive deathlink signal!")
+        return ok
 
     # OpenGOAL has a limit of 8 parameters per function. We've already hit this limit. So, define a new datatype
     # in OpenGOAL that holds all these options, instantiate the type here, and have ap-setup-options! function take
@@ -367,7 +372,8 @@ class Jak2ReplClient:
                             slot_seed: str,
                             trap_time: int,
                             completion_type: int,
-                            completion_value: int) -> bool:
+                            specific_mission_value: int,
+                            mission_count_value: int) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
@@ -376,13 +382,15 @@ class Jak2ReplClient:
                                   f":slot-seed {sanitized_seed} "
                                   f":trap-duration {trap_time}.0 "
                                   f":completion-type {completion_type} "
-                                  f":completion-value {completion_value} ))")
+                                  f":completion-value {specific_mission_value} "
+                                  f":completion-mission-count {mission_count_value}))")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
                    f"   Trap Duration {trap_time}, \n"
                    f"   Goal Type {completion_type}, \n"
-                   f"   Goal Value {completion_value}... ")
+                   f"   Specific Value {specific_mission_value}, \n"
+                   f"   Mission Count Value {mission_count_value}... ")
         if ok:
             logger.debug(message + "Success!")
         else:
