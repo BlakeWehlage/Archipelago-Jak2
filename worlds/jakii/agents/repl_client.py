@@ -158,8 +158,15 @@ class Jak2ReplClient:
             json_txt_data = self.json_message_queue.get_nowait()
             await self.write_game_text(json_txt_data)
 
-    # This helper function formats and sends `form` as a command to the REPL.
-    # ALL commands to the REPL should be sent using this function.
+    ## this fucking sucks, but it works. this replaces the send_form function
+    async def send_form_no_response(self, form: str) -> bool:
+        """Send a form that doesn't return a response through the socket."""
+        header = struct.pack("<II", len(form), 10)
+        async with self.lock:
+            self.writer.write(header + form.encode())
+            await self.writer.drain()
+        return True
+
     async def send_form(self, form: str, print_ok: bool = True) -> bool:
         header = struct.pack("<II", len(form), 10)
         async with self.lock:
@@ -223,7 +230,7 @@ class Jak2ReplClient:
             for step, command in steps_to_run:
                 self.log_info(logger, f"[{current_step}/{len(steps_to_run)}] {step}...")
                 await asyncio.sleep(0.5)
-                if await self.send_form(command, print_ok=False):
+                if await self.send_form_no_response(command):
                     current_step += 1
                     continue
                 else:
@@ -300,7 +307,7 @@ class Jak2ReplClient:
                      f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.their_item_name)} "
                      f" {self.sanitize_game_text(data.their_item_owner)})))")
-        await self.send_form(f"(begin {body} (none))", print_ok=False)
+        await self.send_form_no_response(f"(begin {body} (none))")
 
     async def receive_item(self):
         item = getattr(self.item_inbox[self.inbox_index], "item")
@@ -320,7 +327,7 @@ class Jak2ReplClient:
 
         # Trap handling
         if TRAP_ID_START <= item <= TRAP_ID_END:
-            ok = await self.send_form(f"(ap-trap-received! '{item_symbol})")
+            ok = await self.send_form_no_response(f"(ap-trap-received! '{item_symbol})")
             if ok:
                 logger.debug(f"Received {item_name}!")
             else:
@@ -328,7 +335,7 @@ class Jak2ReplClient:
             return ok
 
         # Normal item handling
-        ok = await self.send_form(f"(ap-item-received! '{item_symbol})")
+        ok = await self.send_form_no_response(f"(ap-item-received! '{item_symbol})")
         if ok:
             logger.debug(f"Received {item_name}!")
         else:
@@ -355,7 +362,7 @@ class Jak2ReplClient:
                       "'big-explosion"]
         chosen_death = random.choice(death_types)
 
-        ok = await self.send_form(f"(ap-deathlink-received! {chosen_death})")
+        ok = await self.send_form_no_response(f"(ap-deathlink-received! {chosen_death})")
         if ok:
             logger.debug(f"Received deathlink signal!")
         else:
@@ -375,7 +382,7 @@ class Jak2ReplClient:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
-        ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
+        ok = await self.send_form_no_response(f"(ap-setup-options! (new 'static 'ap-seed-options "
                                   f":slot-name {sanitized_name} "
                                   f":slot-seed {sanitized_seed} "
                                   f":trap-duration {trap_time}.0 "
@@ -396,7 +403,7 @@ class Jak2ReplClient:
         return ok
 
     async def send_connection_status(self, status: str) -> bool:
-        ok = await self.send_form(f"(ap-set-connection-status! (ap-connection-status {status}))")
+        ok = await self.send_form_no_response(f"(ap-set-connection-status! (ap-connection-status {status}))")
         if ok:
             logger.debug(f"Connection Status {status} set!")
         else:
