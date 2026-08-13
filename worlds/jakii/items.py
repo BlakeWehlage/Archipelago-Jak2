@@ -22,8 +22,8 @@ ITEM_ID_KEY_START = 1           # Key/progression items start at ID 1
 ITEM_ID_KEY_END = 33            # Key/progression items end at ID 33
 ITEM_ID_FILLER_START = 34       # Filler items start at ID 34 (Dark Eco Pill)
 ITEM_ID_FILLER_END = 39         # Standard filler items end at ID 39
-TRAP_ID_START = 40               # Trap items start at ID 1 (Trip Trap)
-TRAP_ID_END = 56                # Trap items end at ID 17
+TRAP_ID_START = 40              # Trap items start at ID 40 (Trip Trap)
+TRAP_ID_END = 55                # Trap items end at ID 55
 
 # Unified Item Table - Single source of truth for all items
 # Every item is organized by classification using ID ranges defined above
@@ -98,11 +98,10 @@ item_table = {
     49: Jak2ItemData(item_id=49, name="Ledge Trap", symbol="rivals-of-aether"),
     50: Jak2ItemData(item_id=50, name="Mirror Trap", symbol="man-in-the-mirror"),
 
-    # Brand New Jak 2 Traps! (IDs 51-56)
+    # Brand New Jak 2 Traps! (IDs 51-55)
     51: Jak2ItemData(item_id=51, name="High Alert Trap", symbol="five-star"),
     52: Jak2ItemData(item_id=52, name="Ammo Trap", symbol="russian-roulette"),
     53: Jak2ItemData(item_id=53, name="Dark Trap", symbol="anger-issues"),
-    54: Jak2ItemData(item_id=54, name="Speed Trap", symbol="sonic-speed"),
-    55: Jak2ItemData(item_id=55, name="Slow Trap", symbol="la-traffic"),
-    56: Jak2ItemData(item_id=56, name="Hero Trap", symbol="hardcore")
+    54: Jak2ItemData(item_id=54, name="Hero Trap", symbol="hardcore"),
+    55: Jak2ItemData(item_id=56, name="Reverse Trap", symbol="turn-right-to-go-left")
 }

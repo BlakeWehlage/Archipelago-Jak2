@@ -15,7 +15,7 @@ import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
 
 from NetUtils import NetworkItem
-from ..items import item_table, Jak2ItemData, TRAP_ID_START, TRAP_ID_END
+from ..items import item_table, Jak2ItemData, TRAP_ID_START, TRAP_ID_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END
 
 logger = logging.getLogger("Jak2ReplClient")
 
@@ -48,7 +48,7 @@ class Jak2ReplClient:
     lock: Lock
     connected: bool = False
     initiated_connect: bool = False  # Signals when user tells us to try reconnecting.
-    # received_deathlink: bool = False
+    received_deathlink: bool = False
 
     # Variables to handle the title screen and initial game connection.
     initial_item_count = -1  # Brand new games have 0 items, so initialize this to -1.
@@ -63,6 +63,7 @@ class Jak2ReplClient:
     item_inbox: dict[int, NetworkItem] = {}
     inbox_index = 0
     json_message_queue: Queue[JsonMessageData] = queue.Queue()
+    is_replaying: bool = False
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
@@ -130,15 +131,25 @@ class Jak2ReplClient:
                 self.processed_initial_items = True
                 await self.send_connection_status("ready")
 
+        if self.memr.needs_item_replay:
+            self.inbox_index = 0
+            self.is_replaying = True
+            self.memr.needs_item_replay = False
+            await self.send_form_no_response("(set! (-> *ap-info-jak2* needs-item-replay) (the-as uint 0))")
+
         # Receive Items from AP. Handle 1 item per tick.
         if len(self.item_inbox) > self.inbox_index:
             await self.receive_item()
             await self.save_data()
             self.inbox_index += 1
 
-        # if self.received_deathlink:
-        #     await self.receive_deathlink()
-        #     self.received_deathlink = False
+
+        if self.is_replaying and self.inbox_index >= len(self.item_inbox):
+            self.is_replaying = False
+
+        if self.received_deathlink:
+            await self.receive_deathlink()
+            self.received_deathlink = False
 
         # Progressively empty the queue during each tick
         # if text messages happen to be too slow we could pool dequeuing here,
@@ -212,7 +223,7 @@ class Jak2ReplClient:
             for step, command in steps_to_run:
                 self.log_info(logger, f"[{current_step}/{len(steps_to_run)}] {step}...")
                 await asyncio.sleep(0.5)
-                if await self.send_form_no_response(command):
+                if await self.send_form(command, print_ok=False):
                     current_step += 1
                     continue
                 else:
@@ -262,23 +273,34 @@ class Jak2ReplClient:
 
     # Pushes a JsonMessageData object to the json message queue to be processed during the repl main_tick
     def queue_game_text(self, my_item_name, my_item_finder, their_item_name, their_item_owner):
-        # TODO - Re-add message queue when implemented in mod. Until then, pass.
-        # self.json_message_queue.put(JsonMessageData(my_item_name, my_item_finder, their_item_name, their_item_owner))
-        pass
+        self.json_message_queue.put(JsonMessageData(my_item_name, my_item_finder, their_item_name, their_item_owner))
 
     # OpenGOAL can handle both its own string datatype and C-like character pointers (charp).
     async def write_game_text(self, data: JsonMessageData):
         logger.debug(f"Sending info to the in-game messenger!")
         body = ""
         if data.my_item_name and data.my_item_finder:
-            body += (f" (append-messages (-> *ap-messenger* 0) \'recv "
+            is_trap = "Trap" in data.my_item_name
+            if is_trap and data.my_item_finder != "MYSELF":
+                direction = "'trap"
+            elif data.my_item_finder == "MYSELF":
+                direction = "'found"
+            else:
+                direction = "'recv"
+            body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
+                     f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.my_item_name)} "
-                     f" {self.sanitize_game_text(data.my_item_finder)})")
+                     f" {self.sanitize_game_text(data.my_item_finder)})))")
         if data.their_item_name and data.their_item_owner:
-            body += (f" (append-messages (-> *ap-messenger* 0) \'sent "
+            if data.their_item_owner == "MYSELF":
+                direction = "'found"
+            else:
+                direction = "'sent"
+            body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
+                     f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.their_item_name)} "
-                     f" {self.sanitize_game_text(data.their_item_owner)})")
-        await self.send_form_no_response(f"(begin {body} (none))")
+                     f" {self.sanitize_game_text(data.their_item_owner)})))")
+        await self.send_form(f"(begin {body} (none))", print_ok=False)
 
     async def receive_item(self):
         item = getattr(self.item_inbox[self.inbox_index], "item")
@@ -292,9 +314,13 @@ class Jak2ReplClient:
         item_name: str = item_data.name
         item_symbol: str = item_data.symbol
 
+        if self.is_replaying and (TRAP_ID_START <= item <= TRAP_ID_END or
+                                  ITEM_ID_FILLER_START <= item <= ITEM_ID_FILLER_END):
+            return True
+
         # Trap handling
         if TRAP_ID_START <= item <= TRAP_ID_END:
-            ok = await self.send_form_no_response(f"(ap-trap-received! '{item_symbol})")
+            ok = await self.send_form(f"(ap-trap-received! '{item_symbol})")
             if ok:
                 logger.debug(f"Received {item_name}!")
             else:
@@ -302,7 +328,7 @@ class Jak2ReplClient:
             return ok
 
         # Normal item handling
-        ok = await self.send_form_no_response(f"(ap-item-received! '{item_symbol})")
+        ok = await self.send_form(f"(ap-item-received! '{item_symbol})")
         if ok:
             logger.debug(f"Received {item_name}!")
         else:
@@ -310,26 +336,31 @@ class Jak2ReplClient:
 
         return ok
 
-    # NOTE: Deathlink is coming later
-    # async def receive_deathlink(self) -> bool:
-#
+
+    async def receive_deathlink(self) -> bool:
+
         # Because it should be funny sometimes, right?
-#        death_types = ["\'death",
-#                      "\'death",
-#                      "\'death",
-#                      "\'death",
-#                      "\'endlessfall",
-#                      "\'drown-death",
-#                      "\'melt",
-#                      "\'explode"]
-#        chosen_death = random.choice(death_types)
-#
-#        ok = await self.send_form("(ap-deathlink-received! " + chosen_death + ")")
-#        if ok:
-#            logger.debug(f"Received deathlink signal!")
-#        else:
-#            self.log_error(logger, f"Unable to receive deathlink signal!")
-#        return ok
+        death_types = ["'death",
+                      "'death",
+                      "'death",
+                      "'death",
+                      "'endlessfall",
+                      "'dark-eco-pool",
+                      "'crush",
+                      "'smush",
+                      "'drown-death",
+                      "'lava",
+                      "'grenade",
+                      "'explode",
+                      "'big-explosion"]
+        chosen_death = random.choice(death_types)
+
+        ok = await self.send_form(f"(ap-deathlink-received! {chosen_death})")
+        if ok:
+            logger.debug(f"Received deathlink signal!")
+        else:
+            self.log_error(logger, f"Unable to receive deathlink signal!")
+        return ok
 
     # OpenGOAL has a limit of 8 parameters per function. We've already hit this limit. So, define a new datatype
     # in OpenGOAL that holds all these options, instantiate the type here, and have ap-setup-options! function take
@@ -339,22 +370,25 @@ class Jak2ReplClient:
                             slot_seed: str,
                             trap_time: int,
                             completion_type: int,
-                            completion_value: int) -> bool:
+                            specific_mission_value: int,
+                            mission_count_value: int) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
-        ok = await self.send_form_no_response(f"(ap-setup-options! (new 'static 'ap-seed-options "
+        ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
                                   f":slot-name {sanitized_name} "
                                   f":slot-seed {sanitized_seed} "
                                   f":trap-duration {trap_time}.0 "
                                   f":completion-type {completion_type} "
-                                  f":completion-value {completion_value} ))")
+                                  f":completion-value {specific_mission_value} "
+                                  f":completion-mission-count {mission_count_value}))")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
                    f"   Trap Duration {trap_time}, \n"
                    f"   Goal Type {completion_type}, \n"
-                   f"   Goal Value {completion_value}... ")
+                   f"   Specific Value {specific_mission_value}, \n"
+                   f"   Mission Count Value {mission_count_value}... ")
         if ok:
             logger.debug(message + "Success!")
         else:
@@ -362,7 +396,7 @@ class Jak2ReplClient:
         return ok
 
     async def send_connection_status(self, status: str) -> bool:
-        ok = await self.send_form_no_response(f"(ap-set-connection-status! (ap-connection-status {status}))")
+        ok = await self.send_form(f"(ap-set-connection-status! (ap-connection-status {status}))")
         if ok:
             logger.debug(f"Connection Status {status} set!")
         else:
