@@ -212,7 +212,7 @@ class Jak2ReplClient:
             for step, command in steps_to_run:
                 self.log_info(logger, f"[{current_step}/{len(steps_to_run)}] {step}...")
                 await asyncio.sleep(0.5)
-                if await self.send_form(command, print_ok=False):
+                if await self.send_form_no_response(command):
                     current_step += 1
                     continue
                 else:
@@ -278,7 +278,7 @@ class Jak2ReplClient:
             body += (f" (append-messages (-> *ap-messenger* 0) \'sent "
                      f" {self.sanitize_game_text(data.their_item_name)} "
                      f" {self.sanitize_game_text(data.their_item_owner)})")
-        await self.send_form(f"(begin {body} (none))", print_ok=False)
+        await self.send_form_no_response(f"(begin {body} (none))")
 
     async def receive_item(self):
         item = getattr(self.item_inbox[self.inbox_index], "item")
@@ -294,7 +294,7 @@ class Jak2ReplClient:
 
         # Trap handling
         if TRAP_ID_START <= item <= TRAP_ID_END:
-            ok = await self.send_form(f"(ap-trap-received! '{item_symbol})")
+            ok = await self.send_form_no_response(f"(ap-trap-received! '{item_symbol})")
             if ok:
                 logger.debug(f"Received {item_name}!")
             else:
@@ -302,7 +302,7 @@ class Jak2ReplClient:
             return ok
 
         # Normal item handling
-        ok = await self.send_form(f"(ap-item-received! '{item_symbol})")
+        ok = await self.send_form_no_response(f"(ap-item-received! '{item_symbol})")
         if ok:
             logger.debug(f"Received {item_name}!")
         else:
@@ -343,7 +343,7 @@ class Jak2ReplClient:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
-        ok = await self.send_form(f"(ap-setup-options! (new 'static 'ap-seed-options "
+        ok = await self.send_form_no_response(f"(ap-setup-options! (new 'static 'ap-seed-options "
                                   f":slot-name {sanitized_name} "
                                   f":slot-seed {sanitized_seed} "
                                   f":trap-duration {trap_time}.0 "
@@ -362,7 +362,7 @@ class Jak2ReplClient:
         return ok
 
     async def send_connection_status(self, status: str) -> bool:
-        ok = await self.send_form(f"(ap-set-connection-status! (ap-connection-status {status}))")
+        ok = await self.send_form_no_response(f"(ap-set-connection-status! (ap-connection-status {status}))")
         if ok:
             logger.debug(f"Connection Status {status} set!")
         else:
