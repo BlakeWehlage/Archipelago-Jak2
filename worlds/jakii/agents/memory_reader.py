@@ -64,8 +64,11 @@ side_missions_checked_offset = offsets.define(sizeof_uint32, 35)
 
 # Connection status (added in version 2)
 connection_status_offset = offsets.define(sizeof_uint32)  # ap-connection-status enum
+slot_name_offset = offsets.define(sizeof_uint8, 16)
+slot_seed_offset = offsets.define(sizeof_uint8, 8)
 
 # Completion Information
+completion_goal_offset = offsets.define(sizeof_uint8)
 completion_goal_type_offset = offsets.define(sizeof_uint32)
 completion_goal_value_offset = offsets.define(sizeof_uint32)
 completed_offset = offsets.define(sizeof_uint8)

@@ -55,6 +55,10 @@ class Jak2ReplClient:
     received_initial_items = False
     processed_initial_items = False
 
+    # Variables to handle waiting for compilation to finish without blocking the event loop.
+    waiting_for_compile: bool = False
+    compile_ready_time: float = 0.0
+
     # The REPL client needs the REPL/compiler process running, but that process
     # also needs the game running. Therefore, the REPL client needs both running.
     gk_process: pymem.process = None
@@ -77,6 +81,7 @@ class Jak2ReplClient:
                  log_warn_callback: Callable,
                  log_success_callback: Callable,
                  log_info_callback: Callable,
+                 memr,
                  ip: str = "127.0.0.1",
                  port: int = 8181):
         self.ip = ip
@@ -86,11 +91,26 @@ class Jak2ReplClient:
         self.log_warn = log_warn_callback
         self.log_success = log_success_callback
         self.log_info = log_info_callback
+        self.memr = memr
 
     async def main_tick(self):
         if self.initiated_connect:
             await self.connect()
             self.initiated_connect = False
+
+        # Handle compile wait without blocking the event loop
+        if self.waiting_for_compile:
+            if asyncio.get_event_loop().time() >= self.compile_ready_time:
+                self.waiting_for_compile = False
+                self.log_info(logger, "[4/5] Set cheat mode to off...")
+                await asyncio.sleep(0.5)
+                await self.send_form_no_response("(set! *cheat-mode* #f)")
+                await asyncio.sleep(0.5)
+                self.log_info(logger, "[5/5] Run the title screen...")
+                await self.send_form_no_response("(start 'play (get-continue-by-name *game-info* \"title-start\"))")
+                self.log_success(logger, "The REPL is ready!")
+                self.connected = True
+            return
 
         if self.connected:
             try:
@@ -135,7 +155,7 @@ class Jak2ReplClient:
             self.inbox_index = 0
             self.is_replaying = True
             self.memr.needs_item_replay = False
-            await self.send_form_no_response("(set! (-> *ap-info-jak2* needs-item-replay) (the-as uint 0))")
+            await self.send_form_no_response("(set! (-> *ap-info-jak2* needs-item-replay) (the-as uint8 0))")
 
         # Receive Items from AP. Handle 1 item per tick.
         if len(self.item_inbox) > self.inbox_index:
@@ -216,30 +236,21 @@ class Jak2ReplClient:
             return
 
         if self.reader and self.writer:
+            self.log_info(logger, "[1/5] Listen on the game's port...")
+            await asyncio.sleep(0.5)
+            await self.send_form_no_response("(lt)")
+            await asyncio.sleep(3)
 
-            # Run these steps in order to set up the game for Archipelago.
-            current_step = 1
-            steps_to_run = [
-                ("Listen on the game's port", "(lt)"),
-                ("Set debug flag to on", "(set! *debug-segment* #t)"),
-                ("Compile the game", "(mi)"),
-                # ("Set debug flag to off", "(set! *debug-segment* #f)"),
-                ("Set cheat mode to off", "(set! *cheat-mode* #f)"),
-                ("Run the title screen", "(start \'play (get-continue-by-name *game-info* \"title-start\"))"),
-            ]
-            for step, command in steps_to_run:
-                self.log_info(logger, f"[{current_step}/{len(steps_to_run)}] {step}...")
-                await asyncio.sleep(0.5)
-                if await self.send_form_no_response(command):
-                    current_step += 1
-                    continue
-                else:
-                    self.log_error(logger, f"[{current_step}/{len(steps_to_run)}] Failed to {step}!")
-                    self.connected = False
-                    break  # Skips the for/else block below.
-            else:
-                self.log_success(logger, "The REPL is ready!")
-                self.connected = True
+            self.log_info(logger, "[2/5] Set debug flag to on...")
+            await asyncio.sleep(0.5)
+            await self.send_form_no_response("(set! *debug-segment* #t)")
+
+            self.log_info(logger, "[3/5] Compile the game...")
+            await asyncio.sleep(0.5)
+            await self.send_form_no_response("(mi)")
+            self.log_info(logger, "Waiting for compilation to finish")
+            self.waiting_for_compile = True
+            self.compile_ready_time = asyncio.get_event_loop().time() + 30
 
     async def print_status(self):
         gc_proc_id = str(self.goalc_process.process_id) if self.goalc_process else "None"

@@ -29,6 +29,7 @@ from .game_id import jak2_name
 from .agents.memory_reader import Jak2MemoryReader, autopsy
 from .agents.repl_client import Jak2ReplClient
 from . import JakIIWorld
+from .items import item_table, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END, TRAP_ID_START, TRAP_ID_END
 from .locs.mission_locations import main_mission_table
 from .options import CompletionCondition
 
@@ -99,10 +100,6 @@ class Jak2Context(CommonContext):
     slot_seed: str
 
     def __init__(self, server_address: str | None, password: str | None) -> None:
-        self.repl = Jak2ReplClient(self.on_log_error,
-                                   self.on_log_warn,
-                                   self.on_log_success,
-                                   self.on_log_info)
         self.memr = Jak2MemoryReader(self.on_location_check,
                                      self.on_finish_check,
                                      self.on_deathlink_check,
@@ -111,6 +108,11 @@ class Jak2Context(CommonContext):
                                      self.on_log_warn,
                                      self.on_log_success,
                                      self.on_log_info)
+        self.repl = Jak2ReplClient(self.on_log_error,
+                                   self.on_log_warn,
+                                   self.on_log_success,
+                                   self.on_log_info,
+                                   self.memr)
         # self.repl.load_data()
         # self.memr.load_data()
         super().__init__(server_address, password)
@@ -191,27 +193,26 @@ class Jak2Context(CommonContext):
             item = args["item"]
             recipient = args["receiving"]
 
+            def is_filler_or_trap(item_id: int) -> bool:
+                return (ITEM_ID_FILLER_START <= item_id <= ITEM_ID_FILLER_END) or (
+                        TRAP_ID_START <= item_id <= TRAP_ID_END)
+
             # Receiving an item from the server.
             if self.slot_concerns_self(recipient):
                 my_item_name = self.item_names.lookup_in_game(item.item)
-
-                # Did we find it, or did someone else?
-                if self.slot_concerns_self(item.player):
-                    my_item_finder = "MYSELF"
+                if is_filler_or_trap(item.item):
+                    if self.slot_concerns_self(item.player):
+                        my_item_finder = "MYSELF"
+                    else:
+                        my_item_finder = self.player_names[item.player]
                 else:
-                    my_item_finder = self.player_names[item.player]
+                    my_item_name = None
 
             # Sending an item to the server.
-            if self.slot_concerns_self(item.player):
+            if self.slot_concerns_self(item.player) and not self.slot_concerns_self(recipient):
                 their_item_name = self.item_names.lookup_in_slot(item.item, recipient)
+                their_item_owner = self.player_names[recipient]
 
-                # Does it belong to us, or to someone else?
-                if self.slot_concerns_self(recipient):
-                    their_item_owner = "MYSELF"
-                else:
-                    their_item_owner = self.player_names[recipient]
-
-            # Write to game display.
             self.repl.queue_game_text(my_item_name, my_item_finder, their_item_name, their_item_owner)
 
     # Even though N items come in as 1 ReceivedItems packet, there are still N PrintJson packets to process,
