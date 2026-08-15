@@ -26,7 +26,7 @@ class NumberOfMissionsForCompletion(Range):
     """Set the number of missions to complete for the "Complete Number of Missions" completion condition."""
     display_name = "Number of Missions for Completion"
     range_start = 5
-    range_end = 92
+    range_end = 97
     default = 65
 
 
