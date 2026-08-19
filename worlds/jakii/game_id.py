@@ -1,10 +1,10 @@
 import Utils
 
-# this is the only thing. that's it :)
+# this is no longer the only thing. that's not it :(
 jak2_name = "Jak II"
 
 # Maximum base item ID, used for filler item offset calculations
-# Current highest key item ID is 34, so we use a higher base for future expansion
+# Current highest key item ID is 33, so we use a higher base for future expansion
 jak2_max = 100000
 
 # The executable name of the GOAL Kernel.

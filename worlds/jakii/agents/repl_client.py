@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
@@ -185,8 +185,8 @@ class Jak2ReplClient:
         if self.connected:
             try:
                 # self.gk_process.read_bool(self.gk_process.base_address)  # Ping to see if it's alive.
-                OpenProcess(process_name=jak2_gk)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_gk)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -198,11 +198,12 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
             try:
                 # self.goalc_process.read_bool(self.goalc_process.base_address)  # Ping to see if it's alive.
-                OpenProcess(process_name=jak2_goalc)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_goalc)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -214,6 +215,7 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
         else:
             return
@@ -282,17 +284,19 @@ class Jak2ReplClient:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)  # The GOAL Kernel
+            self.gk_process = OpenProcess(name=jak2_gk)  # The GOAL Kernel
             logger.debug("Found the gk process: " + str(self.gk_process.pid))
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
+            logger.error(e)
             return
 
         try:
-            self.goalc_process = OpenProcess(process_name=jak2_goalc)  # The GOAL Compiler and REPL
+            self.goalc_process = OpenProcess(name=jak2_goalc)  # The GOAL Compiler and REPL
             logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the compiler process.")
+            logger.error(e)
             return
 
         try:
@@ -330,8 +334,8 @@ class Jak2ReplClient:
             self.compile_ready_time = asyncio.get_event_loop().time() + 30
 
     async def print_status(self):
-        gc_proc_id = str(self.goalc_process.process_id) if self.goalc_process else "None"
-        gk_proc_id = str(self.gk_process.process_id) if self.gk_process else "None"
+        gc_proc_id = str(self.goalc_process.pid) if self.goalc_process else "None"
+        gk_proc_id = str(self.gk_process.pid) if self.gk_process else "None"
         msg = f"REPL Status:\n" f"   REPL process ID: {gc_proc_id}\n" f"   Game process ID: {gk_proc_id}\n"
         try:
             if self.reader and self.writer:
@@ -340,7 +344,9 @@ class Jak2ReplClient:
                 msg += f"   Game websocket: {addr}\n"
         except ConnectionResetError:
             msg += f"   Connection to the game was lost or reset!"
-        last_item = str(getattr(self.item_inbox[self.inbox_index], "item")) if self.inbox_index else "None"
+        last_item = str(getattr(self.item_inbox[self.inbox_index], "item")) if (self.inbox_index
+                                                                                and self.inbox_index <
+                                                                                len(self.item_inbox)) else "None"
         msg += f"   Last item received: {last_item}\n"
         self.log_info(logger, msg)
 

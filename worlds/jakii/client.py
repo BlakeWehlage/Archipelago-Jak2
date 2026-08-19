@@ -15,7 +15,7 @@ from typing import Awaitable
 
 # Misc imports
 import colorama
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError
+from PyMemoryEditor import OpenProcess, ProcessNotFoundError, AmbiguousProcessNameError
 
 # Archipelago imports
 import ModuleUpdate
@@ -288,13 +288,22 @@ class Jak2Context(CommonContext):
 
     async def run_repl_loop(self):
         while True:
-            await self.repl.main_tick()
-            await asyncio.sleep(0.1)
+            try:
+                await self.repl.main_tick()
+                await asyncio.sleep(0.1)
+            # the catch re-engages the repl loop, enabling the client to reconnect if the process is lost
+            except NoSuchProcess:
+                logger.debug("Compiler process lost. Restarting Compiler loop.")
 
     async def run_memr_loop(self):
         while True:
-            await self.memr.main_tick()
-            await asyncio.sleep(0.1)
+            try:
+                await self.memr.main_tick()
+                await asyncio.sleep(0.1)
+            # the catch re-engages the memr loop, enabling the client to reconnect if the process is lost
+            except NoSuchProcess:
+                logger.debug("Memory Reader process lost. Restarting Memory Reader loop.")
+
 
 
 def find_root_directory(ctx: Jak2Context):
@@ -405,17 +414,25 @@ async def run_game(ctx: Jak2Context):
     # These may already be running. If they are not running, try to start them.
     gk_running = False
     try:
-        OpenProcess(process_name=jak2_gk)  # The GOAL Kernel
+        OpenProcess(name=jak2_gk)  # The GOAL Kernel
         gk_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Game not running, attempting to start.")
+    except AmbiguousProcessNameError:
+        ctx.on_log_error(logger, "Two or more instances of the game were found.  "
+                                         "Please close one and restart this client.")
+        return
 
     goalc_running = False
     try:
-        OpenProcess(process_name=jak2_goalc)  # The GOAL Compiler and REPL
+        OpenProcess(name=jak2_goalc)  # The GOAL Compiler and REPL
         goalc_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Compiler not running, attempting to start.")
+    except AmbiguousProcessNameError:
+        ctx.on_log_error(logger, "Two or more instances of the game were found.  "
+                                         "Please close one and restart this client.")
+        return
 
     try:
         auto_detect_root_directory = JakIIWorld.settings.auto_detect_root_directory

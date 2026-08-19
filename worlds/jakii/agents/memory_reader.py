@@ -3,7 +3,7 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 from dataclasses import dataclass
 
 import Utils
@@ -197,9 +197,8 @@ class Jak2MemoryReader:
 
         if self.connected:
             try:
-                # self.gk_process.read_bool(self.gk_process.base_address)  # Ping to see if it's alive.
-                OpenProcess(process_name=jak2_gk)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_gk)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -211,6 +210,7 @@ class Jak2MemoryReader:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
         else:
             return
@@ -241,17 +241,20 @@ class Jak2MemoryReader:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)  # The GOAL Kernel
-            logger.debug("Found the gk process: " + str(self.gk_process.pid))
-        except ProcessNotFoundError:
+            self.gk_process = OpenProcess(name=jak2_gk)  # The GOAL Kernel
+            if self.gk_process:
+                logger.debug("Found the gk process: " + str(self.gk_process.pid))
+            else:
+                return
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
+            logger.error(e)
             self.connected = False
             return
 
         if Utils.is_windows or Utils.is_linux:
-            marker_addresses = list(
-                self.gk_process.search_by_value(bytes, len(self.marker), self.marker, writeable_only=True)
-            )
+            marker_addresses = list(self.gk_process.search_by_value(bytes, len(self.marker), self.marker,
+                                                                    writeable_only=True) if self.gk_process else [])
             if len(marker_addresses) > 0:
                 # If we don't find the marker in the first loaded module, we've failed.
                 goal_pointer = marker_addresses[0] + len(self.marker) + 7
@@ -288,7 +291,7 @@ class Jak2MemoryReader:
                 self.connected = True
             else:
                 raise Exception(memory_version_offset, sizeof_uint32)
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess, Exception) as e:
+        except Exception as e:
             if memory_version is None:
                 msg = (
                     f"Could not find a version number in the OpenGOAL memory structure!\n"
@@ -315,10 +318,11 @@ class Jak2MemoryReader:
                     f"   Close all launchers, games, clients, and console windows, then restart Archipelago."
                 )
             self.log_error(logger, msg)
+            logger.error(e)
             self.connected = False
 
     async def print_status(self):
-        proc_id = str(self.gk_process.process_id) if self.gk_process else "None"
+        proc_id = str(self.gk_process.pid) if self.gk_process else "None"
         last_loc = str(self.location_outbox[self.outbox_index - 1] if self.outbox_index else "None")
         msg = (
             f"Memory Reader Status:\n"
@@ -394,7 +398,7 @@ class Jak2MemoryReader:
             deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
             self.deathlink_enabled = bool(deathlink_flag)
 
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+        except (PyMemoryEditorError, OSError) as e:
             msg = (
                 f"Error reading game memory! (Did the game crash?)\n"
                 f"Please close all open windows and reopen the Jak II Client "
@@ -406,11 +410,14 @@ class Jak2MemoryReader:
                 f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
             )
             self.log_error(logger, msg)
+            logger.error(e)
             self.connected = False
 
         return self.location_outbox
 
     def read_goal_address(self, offset: int, length: int) -> int:
+        if not (self.gk_process and self.goal_address):
+            raise Exception(memory_version_offset, sizeof_uint32)
         return int.from_bytes(
             self.gk_process.read_process_memory(
                 self.goal_address + offset,
