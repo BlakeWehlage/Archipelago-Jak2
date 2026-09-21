@@ -3,7 +3,7 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 from dataclasses import dataclass
 
 from pymem.exception import WinAPIError
@@ -203,8 +203,8 @@ class Jak2MemoryReader:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_gk)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -216,6 +216,7 @@ class Jak2MemoryReader:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
         else:
             return
@@ -246,13 +247,14 @@ class Jak2MemoryReader:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)
+            self.gk_process = OpenProcess(name=jak2_gk)
             if self.gk_process:
                 logger.debug("Found the gk process: " + str(self.gk_process.pid) if self.gk_process else None)
             else:
                 return
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
+            logger.error(e)
             self.connected = False
             return
 
@@ -290,7 +292,7 @@ class Jak2MemoryReader:
                 self.connected = True
             else:
                 raise Exception(memory_version_offset, sizeof_uint32)
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+        except Exception as e:
             if memory_version is None:
                 msg = (
                     f"Could not find a version number in the OpenGOAL memory structure!\n"
@@ -317,6 +319,7 @@ class Jak2MemoryReader:
                     f"   Close all launchers, games, clients, and console windows, then restart Archipelago."
                 )
             self.log_error(logger, msg)
+            logger.error(e)
             self.connected = False
 
     async def print_status(self):
@@ -405,7 +408,7 @@ class Jak2MemoryReader:
             deathlink_flag = self.read_goal_address(deathlink_enabled_offset, sizeof_uint8)
             self.deathlink_enabled = bool(deathlink_flag)
 
-        except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+        except (PyMemoryEditorError, OSError) as e:
             msg = (
                 f"Error reading game memory! (Did the game crash?)\n"
                 f"Please close all open windows and reopen the Jak II Client "
@@ -417,6 +420,7 @@ class Jak2MemoryReader:
                 f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
             )
             self.log_error(logger, msg)
+            logger.error(e)
             self.connected = False
 
         return self.location_outbox

@@ -374,11 +374,13 @@ side_mission_table = {
                              slums_to_market(state, player)
                              and state.has("Yellow Security Pass", player)),
     # Extra Race Missions
-    125: Jak2SideMissionData(mission_id=125, task_id=25, name="Beat Erol in Race Challenge (Side Mission, Near Hip Hog)",
+    125: Jak2SideMissionData(mission_id=125, task_id=101,
+                             name="Beat Erol in Race Challenge (Side Mission, Near Hip Hog)",
                              rule=lambda state, player:
                              slums_to_port(state, player)
                              and state.has("Yellow Security Pass", player)),
-    126: Jak2SideMissionData(mission_id=126, task_id=26, name="Port Race Side Mission (Near Port/Industrial Connection)",
+    126: Jak2SideMissionData(mission_id=126, task_id=102,
+                             name="Port Race Side Mission (Near Port/Industrial Connection)",
                              rule=lambda state, player:
                              slums_to_port(state, player)),
     # Stadium Challenges

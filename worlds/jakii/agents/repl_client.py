@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
@@ -113,8 +113,8 @@ class Jak2ReplClient:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_gk)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -126,11 +126,12 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
             try:
                 # Ping to see if it's alive.
-                OpenProcess(process_name=jak2_goalc)
-            except (ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess):
+                OpenProcess(name=jak2_goalc)
+            except PyMemoryEditorError as e:
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
                     f"Please close all open windows and reopen the Jak II Client "
@@ -142,6 +143,7 @@ class Jak2ReplClient:
                     f"   Then close and reopen the Jak II Client from the Archipelago Launcher."
                 )
                 self.log_error(logger, msg)
+                logger.error(e)
                 self.connected = False
         else:
             return
@@ -214,17 +216,19 @@ class Jak2ReplClient:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)
+            self.gk_process = OpenProcess(name=jak2_gk)
             logger.debug("Found the gk process: " + str(self.gk_process.pid))
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
+            logger.error(e)
             return
 
         try:
-            self.goalc_process = OpenProcess(process_name=jak2_goalc)
+            self.goalc_process = OpenProcess(name=jak2_goalc)
             logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
-        except ProcessNotFoundError:
+        except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the compiler process.")
+            logger.error(e)
             return
 
         try:
@@ -308,6 +312,7 @@ class Jak2ReplClient:
         body = ""
         if data.my_item_name and data.my_item_finder:
             is_trap = "Trap" in data.my_item_name
+            is_filler = any(f in data.my_item_name for f in ("Pill", "Ammo", "Health Pack"))
             if is_trap and data.my_item_finder != "MYSELF":
                 direction = "'trap"
             elif data.my_item_finder == "MYSELF":
@@ -317,8 +322,10 @@ class Jak2ReplClient:
             body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
                      f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.my_item_name)} "
-                     f" {self.sanitize_game_text(data.my_item_finder)})))")
+                     f" {self.sanitize_game_text(data.my_item_finder)}"
+                     f" {'#t' if is_filler else '#f'})))")
         if data.their_item_name and data.their_item_owner:
+            is_filler_theirs = any(f in data.their_item_name for f in ("Pill", "Ammo", "Health Pack"))
             if data.their_item_owner == "MYSELF":
                 direction = "'found"
             else:
@@ -326,7 +333,8 @@ class Jak2ReplClient:
             body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
                      f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.their_item_name)} "
-                     f" {self.sanitize_game_text(data.their_item_owner)})))")
+                     f" {self.sanitize_game_text(data.their_item_owner)}"
+                     f" {'#t' if is_filler_theirs else '#f'})))")
         await self.send_form_no_response(f"(begin {body} (none))")
 
     async def receive_item(self):

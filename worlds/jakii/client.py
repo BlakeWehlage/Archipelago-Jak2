@@ -18,7 +18,7 @@ import colorama
 from psutil import NoSuchProcess
 
 import PyMemoryEditor
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, ProcessIDNotExistsError, ClosedProcess
+from PyMemoryEditor import OpenProcess, ProcessNotFoundError, AmbiguousProcessNameError
 
 # Archipelago imports
 import ModuleUpdate
@@ -421,17 +421,25 @@ async def run_game(ctx: Jak2Context):
     # These may already be running. If they are not running, try to start them.
     gk_running = False
     try:
-        OpenProcess(process_name=jak2_gk)
+        OpenProcess(name=jak2_gk)
         gk_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Game not running, attempting to start.")
+    except AmbiguousProcessNameError:
+        ctx.on_log_error(logger, "Two or more instances of the game were found. "
+                                         "Please close one and restart this client.")
+        return
 
     goalc_running = False
     try:
-        OpenProcess(process_name=jak2_goalc)
+        OpenProcess(name=jak2_goalc)
         goalc_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Compiler not running, attempting to start.")
+    except AmbiguousProcessNameError:
+        ctx.on_log_error(logger, "Two or more instances of the game were found. "
+                                         "Please close one and restart this client.")
+        return
 
     try:
         auto_detect_root_directory = JakIIWorld.settings.auto_detect_root_directory
