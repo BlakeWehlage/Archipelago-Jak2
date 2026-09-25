@@ -88,10 +88,6 @@ deathlink_enabled_offset = offsets.define(sizeof_uint8)
 # Trap Information
 trap_duration_offset = offsets.define(sizeof_float)
 
-# Item Replay Information
-needs_item_replay_offset = offsets.define(sizeof_uint8)
-initial_replay_done_offset = offsets.define(sizeof_uint8)
-
 # End marker (uint8 array of 4 bytes - "end\0")
 end_marker_offset = offsets.define(sizeof_uint8, 4)
 
@@ -154,7 +150,6 @@ class Jak2MemoryReader:
     location_outbox: list[int] = []
     outbox_index: int = 0
     finished_game: bool = False
-    needs_item_replay: bool = False
 
     # Deathlink handling
     deathlink_enabled: bool = False
@@ -392,10 +387,6 @@ class Jak2MemoryReader:
             if completed > 0 and not self.finished_game:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
-
-            needs_replay = self.read_goal_address(needs_item_replay_offset, sizeof_uint8)
-            if needs_replay > 0:
-                self.needs_item_replay = True
 
             death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
             death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)

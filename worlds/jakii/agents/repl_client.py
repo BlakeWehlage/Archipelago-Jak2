@@ -66,7 +66,6 @@ class Jak2ReplClient:
     item_inbox: dict[int, NetworkItem] = {}
     inbox_index = 0
     json_message_queue: Queue[JsonMessageData] = queue.Queue()
-    is_replaying: bool = False
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
@@ -157,21 +156,11 @@ class Jak2ReplClient:
                 self.processed_initial_items = True
                 await self.send_connection_status("ready")
 
-        if self.memr.needs_item_replay:
-            self.inbox_index = 0
-            self.is_replaying = True
-            self.memr.needs_item_replay = False
-            await self.send_form_no_response("(set! (-> *ap-info-jak2* needs-item-replay) (the-as uint8 0))")
-
         # Receive Items from AP. Handle 1 item per tick.
         if len(self.item_inbox) > self.inbox_index:
             await self.receive_item()
             await self.save_data()
             self.inbox_index += 1
-
-
-        if self.is_replaying and self.inbox_index >= len(self.item_inbox):
-            self.is_replaying = False
 
         if self.received_deathlink:
             await self.receive_deathlink()
@@ -349,9 +338,6 @@ class Jak2ReplClient:
         item_name: str = item_data.name
         item_symbol: str = item_data.symbol
 
-        if self.is_replaying and (TRAP_ID_START <= item <= TRAP_ID_END or
-                                  ITEM_ID_FILLER_START <= item <= ITEM_ID_FILLER_END):
-            return True
 
         # Trap handling
         if TRAP_ID_START <= item <= TRAP_ID_END:
