@@ -3,16 +3,16 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
-try:
-    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
-except ImportError:
-    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
-    PyMemoryEditorError = ProcessNotFoundError
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 from dataclasses import dataclass
 
+from pymem.exception import WinAPIError
+
 import Utils
-from worlds.jakii.locs.mission_locations import main_tasks_to_missions, side_tasks_to_missions, get_item_id_by_feature_id
-from worlds.jakii.game_id import jak2_gk
+from worlds.jakii.locs.mission_locations import (main_tasks_to_missions,
+                                                 side_tasks_to_missions,
+                                                 get_item_id_by_feature_id)
+from ..game_id import jak2_gk
 
 logger = logging.getLogger("Jak2MemoryReader")
 
@@ -87,7 +87,6 @@ deathlink_enabled_offset = offsets.define(sizeof_uint8)
 
 # Trap Information
 trap_duration_offset = offsets.define(sizeof_float)
-
 
 # End marker (uint8 array of 4 bytes - "end\0")
 end_marker_offset = offsets.define(sizeof_uint8, 4)
@@ -199,7 +198,7 @@ class Jak2MemoryReader:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
+                OpenProcess(name=jak2_gk)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
@@ -243,9 +242,9 @@ class Jak2MemoryReader:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)
+            self.gk_process = OpenProcess(name=jak2_gk)
             if self.gk_process:
-                logger.debug("Found the gk process: " + str(self.gk_process.pid))
+                logger.debug("Found the gk process: " + str(self.gk_process.pid) if self.gk_process else None)
             else:
                 return
         except PyMemoryEditorError as e:
@@ -254,29 +253,24 @@ class Jak2MemoryReader:
             self.connected = False
             return
 
-        if Utils.is_windows or Utils.is_linux:
-            marker_addresses = list(self.gk_process.search_by_value(bytes, len(self.marker), self.marker,
-                                                                    writeable_only=True) if self.gk_process else [])
-            if len(marker_addresses) > 0:
-                # If we don't find the marker in the first loaded module, we've failed.
-                goal_pointer = marker_addresses[0] + len(self.marker) + 7
+        marker_addresses = list(self.gk_process.search_by_value(bytes, len(self.marker), self.marker,
+                                                                writeable_only=True) if self.gk_process else [])
+        if len(marker_addresses) > 0:
+            # If we don't find the marker in the first loaded module, we've failed.
+            goal_pointer = marker_addresses[0] + len(self.marker) + 7
 
-                # At this address is another address that contains the struct we're looking for: the game's state.
-                # From here we need to add the length in bytes for the marker and 4 bytes of padding,
-                # and the struct address is 8 bytes long (it's an uint64).
-                self.goal_address = int.from_bytes(
-                    self.gk_process.read_process_memory(goal_pointer, bytes, sizeof_uint64),
-                    byteorder="little",
-                    signed=False,
-                )
-                logger.debug("Found the archipelago memory address: " + str(self.goal_address))
-                await self.verify_memory_version()
-            else:
-                self.log_error(logger, "Could not find the Archipelago marker address!")
-                self.connected = False
-
+            # At this address is another address that contains the struct we're looking for: the game's state.
+            # From here we need to add the length in bytes for the marker and 4 bytes of padding,
+            # and the struct address is 8 bytes long (it's an uint64).
+            self.goal_address = int.from_bytes(
+                self.gk_process.read_process_memory(goal_pointer, bytes, sizeof_uint64),
+                byteorder="little",
+                signed=False,
+            )
+            logger.debug("Found the archipelago memory address: " + str(self.goal_address))
+            await self.verify_memory_version()
         else:
-            self.log_error(logger, f"Unsupported operating system: {sys.platform}!")
+            self.log_error(logger, "Could not find the Archipelago marker address!")
             self.connected = False
 
     async def verify_memory_version(self):
@@ -394,6 +388,9 @@ class Jak2MemoryReader:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
 
+            needs_replay = self.read_goal_address(needs_item_replay_offset, sizeof_uint8)
+            if needs_replay > 0:
+                self.needs_item_replay = True
 
             death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
             death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)

@@ -8,11 +8,7 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-try:
-    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
-except ImportError:
-    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
-    PyMemoryEditorError = ProcessNotFoundError
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
@@ -70,6 +66,7 @@ class Jak2ReplClient:
     item_inbox: dict[int, NetworkItem] = {}
     inbox_index = 0
     json_message_queue: Queue[JsonMessageData] = queue.Queue()
+    is_replaying: bool = False
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
@@ -116,7 +113,7 @@ class Jak2ReplClient:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
+                OpenProcess(name=jak2_gk)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
@@ -160,14 +157,11 @@ class Jak2ReplClient:
                 self.processed_initial_items = True
                 await self.send_connection_status("ready")
 
-
         # Receive Items from AP. Handle 1 item per tick.
         if len(self.item_inbox) > self.inbox_index:
             await self.receive_item()
             await self.save_data()
             self.inbox_index += 1
-
-
 
         if self.received_deathlink:
             await self.receive_deathlink()
@@ -195,10 +189,14 @@ class Jak2ReplClient:
             self.writer.write(header + form.encode())
             await self.writer.drain()
 
-            response_data = await self.reader.read(1024)
-            response = response_data.decode()
+            try:
+                response_data = await self.reader.read(1024)
+                response = response_data.decode()
+            except asyncio.TimeoutError:
+                self.log_error(logger, f"Timed out while waiting for REPL response to {form}")
+                return False
 
-            if "OK!" in response:
+            if response and len(response.strip()) > 0:
                 if print_ok:
                     logger.debug(response)
                 return True
@@ -208,7 +206,7 @@ class Jak2ReplClient:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)
+            self.gk_process = OpenProcess(name=jak2_gk)
             logger.debug("Found the gk process: " + str(self.gk_process.pid))
         except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
@@ -216,7 +214,7 @@ class Jak2ReplClient:
             return
 
         try:
-            self.goalc_process = OpenProcess(process_name=jak2_goalc)
+            self.goalc_process = OpenProcess(name=jak2_goalc)
             logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
         except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the compiler process.")
@@ -304,6 +302,7 @@ class Jak2ReplClient:
         body = ""
         if data.my_item_name and data.my_item_finder:
             is_trap = "Trap" in data.my_item_name
+            is_filler = any(f in data.my_item_name for f in ("Pill", "Ammo", "Health Pack"))
             if is_trap and data.my_item_finder != "MYSELF":
                 direction = "'trap"
             elif data.my_item_finder == "MYSELF":
@@ -313,8 +312,10 @@ class Jak2ReplClient:
             body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
                      f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.my_item_name)} "
-                     f" {self.sanitize_game_text(data.my_item_finder)})))")
+                     f" {self.sanitize_game_text(data.my_item_finder)}"
+                     f" {'#t' if is_filler else '#f'})))")
         if data.their_item_name and data.their_item_owner:
+            is_filler_theirs = any(f in data.their_item_name for f in ("Pill", "Ammo", "Health Pack"))
             if data.their_item_owner == "MYSELF":
                 direction = "'found"
             else:
@@ -322,7 +323,8 @@ class Jak2ReplClient:
             body += (f" (let ((m (the ap-messenger (process-by-name \"ap-messenger\" *active-pool*)))) "
                      f" (when m (append-messages m {direction} "
                      f" {self.sanitize_game_text(data.their_item_name)} "
-                     f" {self.sanitize_game_text(data.their_item_owner)})))")
+                     f" {self.sanitize_game_text(data.their_item_owner)}"
+                     f" {'#t' if is_filler_theirs else '#f'})))")
         await self.send_form_no_response(f"(begin {body} (none))")
 
     async def receive_item(self):
@@ -396,8 +398,7 @@ class Jak2ReplClient:
                             oracle_cost_level0: int,
                             oracle_cost_level1: int,
                             oracle_cost_level2: int,
-                            oracle_cost_level3: int,
-                            deathlink: int = 0) -> bool:
+                            oracle_cost_level3: int) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
@@ -412,8 +413,7 @@ class Jak2ReplClient:
                                   f":oracle-cost-level0 {oracle_cost_level0} "
                                   f":oracle-cost-level1 {oracle_cost_level1} "
                                   f":oracle-cost-level2 {oracle_cost_level2} "
-                                  f":oracle-cost-level3 {oracle_cost_level3} "
-                                  f":deathlink {deathlink}))")
+                                  f":oracle-cost-level3 {oracle_cost_level3})) ")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
@@ -425,8 +425,7 @@ class Jak2ReplClient:
                    f"   Oracle Cost Level0 {oracle_cost_level0}, \n"
                    f"   Oracle Cost Level1 {oracle_cost_level1}, \n"
                    f"   Oracle Cost Level2 {oracle_cost_level2}, \n"
-                   f"   Oracle Cost Level3 {oracle_cost_level3}, \n"
-                   f"   Deathlink {deathlink}... ")
+                   f"   Oracle Cost Level3 {oracle_cost_level3}, \n")
         if ok:
             logger.debug(message + "Success!")
         else:
