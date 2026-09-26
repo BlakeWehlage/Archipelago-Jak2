@@ -17,9 +17,11 @@ from typing import Awaitable
 import colorama
 from psutil import NoSuchProcess
 
-import PyMemoryEditor
-from PyMemoryEditor import OpenProcess, ProcessNotFoundError, AmbiguousProcessNameError
-
+try:
+    from PyMemoryEditor import OpenProcess, ProcessNotFoundError, AmbiguousProcessNameError
+except ImportError:
+    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
+    AmbiguousProcessNameError = ProcessNotFoundError
 # Archipelago imports
 import ModuleUpdate
 import Utils

@@ -3,7 +3,11 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
-from PyMemoryEditor import OpenProcess, PyMemoryEditorError
+try:
+    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
+except ImportError:
+    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
+    PyMemoryEditorError = ProcessNotFoundError
 from dataclasses import dataclass
 
 from pymem.exception import WinAPIError
