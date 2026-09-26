@@ -116,7 +116,7 @@ class Jak2ReplClient:
 
         if self.connected:
             try:
-                OpenProcess(name=jak2_gk)
+                OpenProcess(process_name=jak2_gk)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
@@ -133,7 +133,7 @@ class Jak2ReplClient:
                 self.connected = False
             try:
                 # Ping to see if it's alive.
-                OpenProcess(name=jak2_goalc)
+                OpenProcess(process_name=jak2_goalc)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
@@ -209,7 +209,7 @@ class Jak2ReplClient:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(name=jak2_gk)
+            self.gk_process = OpenProcess(process_name=jak2_gk)
             logger.debug("Found the gk process: " + str(self.gk_process.pid))
         except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the game process.")
@@ -217,7 +217,7 @@ class Jak2ReplClient:
             return
 
         try:
-            self.goalc_process = OpenProcess(name=jak2_goalc)
+            self.goalc_process = OpenProcess(process_name=jak2_goalc)
             logger.debug("Found the goalc process: " + str(self.goalc_process.pid))
         except PyMemoryEditorError as e:
             self.log_error(logger, "Could not find the compiler process.")
