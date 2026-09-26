@@ -15,7 +15,7 @@ from asyncio import StreamReader, StreamWriter, Lock
 
 from NetUtils import NetworkItem
 from ..items import item_table, Jak2ItemData, TRAP_ID_START, TRAP_ID_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END
-from worlds.jakii.game_id import jak2_gk, jak2_goalc
+from ..game_id import jak2_gk, jak2_goalc
 
 logger = logging.getLogger("Jak2ReplClient")
 
@@ -66,7 +66,6 @@ class Jak2ReplClient:
     item_inbox: dict[int, NetworkItem] = {}
     inbox_index = 0
     json_message_queue: Queue[JsonMessageData] = queue.Queue()
-    is_replaying: bool = False
 
     # Logging callbacks
     # These will write to the provided logger, as well as the Client GUI with color markup.
@@ -130,7 +129,7 @@ class Jak2ReplClient:
                 self.connected = False
             try:
                 # Ping to see if it's alive.
-                OpenProcess(process_name=jak2_goalc)
+                OpenProcess(name=jak2_goalc)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
@@ -398,7 +397,8 @@ class Jak2ReplClient:
                             oracle_cost_level0: int,
                             oracle_cost_level1: int,
                             oracle_cost_level2: int,
-                            oracle_cost_level3: int) -> bool:
+                            oracle_cost_level3: int,
+                            minigame_medal_checks: int = 0) -> bool:
         sanitized_name = self.sanitize_file_text(slot_name)
         sanitized_seed = self.sanitize_file_text(slot_seed)
 
@@ -413,7 +413,8 @@ class Jak2ReplClient:
                                   f":oracle-cost-level0 {oracle_cost_level0} "
                                   f":oracle-cost-level1 {oracle_cost_level1} "
                                   f":oracle-cost-level2 {oracle_cost_level2} "
-                                  f":oracle-cost-level3 {oracle_cost_level3})) ")
+                                  f":oracle-cost-level3 {oracle_cost_level3} "
+                                  f":minigame-medal-checks {minigame_medal_checks})) ")
         message = (f"Setting options: \n"
                    f"   Slot Name {sanitized_name}, \n"
                    f"   Slot Seed {sanitized_seed}, \n"
@@ -425,7 +426,8 @@ class Jak2ReplClient:
                    f"   Oracle Cost Level0 {oracle_cost_level0}, \n"
                    f"   Oracle Cost Level1 {oracle_cost_level1}, \n"
                    f"   Oracle Cost Level2 {oracle_cost_level2}, \n"
-                   f"   Oracle Cost Level3 {oracle_cost_level3}, \n")
+                   f"   Oracle Cost Level3 {oracle_cost_level3}, \n"
+                   f"   Minigame Medal Checks {minigame_medal_checks}, \n")
         if ok:
             logger.debug(message + "Success!")
         else:

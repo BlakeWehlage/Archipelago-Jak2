@@ -11,7 +11,8 @@ from pymem.exception import WinAPIError
 import Utils
 from worlds.jakii.locs.mission_locations import (main_tasks_to_missions,
                                                  side_tasks_to_missions,
-                                                 get_item_id_by_feature_id)
+                                                 get_item_id_by_feature_id,
+                                                 medal_ids_to_medals)
 from ..game_id import jak2_gk
 
 logger = logging.getLogger("Jak2MemoryReader")
@@ -27,7 +28,7 @@ sizeof_float = 4
 # *****************************************************************************
 # **** This number must match (-> *ap-info-jak2* version) in ap-struct.gc! ****
 # *****************************************************************************
-expected_memory_version = 5
+expected_memory_version = 6
 
 
 # IMPORTANT: OpenGOAL memory structures are particular about the alignment, in memory, of member elements according to
@@ -87,6 +88,10 @@ deathlink_enabled_offset = offsets.define(sizeof_uint8)
 
 # Trap Information
 trap_duration_offset = offsets.define(sizeof_float)
+
+# Minigame medal information (uint in GOAL = uint64 in C++)
+next_medal_index_offset = offsets.define(sizeof_uint64)
+medals_checked_offset = offsets.define(sizeof_uint32, 40)
 
 # End marker (uint8 array of 4 bytes - "end\0")
 end_marker_offset = offsets.define(sizeof_uint8, 4)
@@ -383,14 +388,27 @@ class Jak2MemoryReader:
                 if item_location_id is not None and item_location_id not in self.location_outbox:
                     self.location_outbox.append(item_location_id)
                     logger.debug(f"Item checked! Raw game-feature ID: {item_id} -> Location ID: {item_location_id}")
+
+            # Read completed minigame medals
+            next_medal_idx = self.read_goal_address(next_medal_index_offset, sizeof_uint64)
+            for i in range(int(next_medal_idx)):
+                raw_medal_id = self.read_goal_address(medals_checked_offset + (i * sizeof_uint32), sizeof_uint32)
+
+                if raw_medal_id in medal_ids_to_medals:
+                    medal = medal_ids_to_medals[raw_medal_id]
+                    loc_id = medal.location_id
+                    if loc_id not in self.location_outbox:
+                        self.location_outbox.append(loc_id)
+                        logger.debug(
+                            f"Medal earned! Medal ID: {raw_medal_id}"
+                            f" -> Location ID: {loc_id}"
+                            f" -> '{medal.name}'"
+                        )
+
             completed = self.read_goal_address(completed_offset, sizeof_uint8)
             if completed > 0 and not self.finished_game:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
-
-            needs_replay = self.read_goal_address(needs_item_replay_offset, sizeof_uint8)
-            if needs_replay > 0:
-                self.needs_item_replay = True
 
             death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
             death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
