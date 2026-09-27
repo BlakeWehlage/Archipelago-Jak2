@@ -207,7 +207,7 @@ class Jak2MemoryReader:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
+                OpenProcess(name=jak2_gk)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
@@ -251,7 +251,7 @@ class Jak2MemoryReader:
 
     async def connect(self):
         try:
-            self.gk_process = OpenProcess(process_name=jak2_gk)
+            self.gk_process = OpenProcess(name=jak2_gk)
             if self.gk_process:
                 logger.debug("Found the gk process: " + str(self.gk_process.pid) if self.gk_process else None)
             else:

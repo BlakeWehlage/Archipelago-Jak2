@@ -8,11 +8,7 @@ from dataclasses import dataclass
 from queue import Queue
 from typing import Callable
 
-try:
-    from PyMemoryEditor import OpenProcess, PyMemoryEditorError
-except ImportError:
-    from PyMemoryEditor import OpenProcess, ProcessNotFoundError
-    PyMemoryEditorError = ProcessNotFoundError
+from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 
 import asyncio
 from asyncio import StreamReader, StreamWriter, Lock
@@ -116,7 +112,7 @@ class Jak2ReplClient:
 
         if self.connected:
             try:
-                OpenProcess(process_name=jak2_gk)
+                OpenProcess(name=jak2_gk)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error reading game memory! (Did the game crash?)\n"
@@ -133,7 +129,7 @@ class Jak2ReplClient:
                 self.connected = False
             try:
                 # Ping to see if it's alive.
-                OpenProcess(process_name=jak2_goalc)
+                OpenProcess(name=jak2_goalc)
             except PyMemoryEditorError as e:
                 msg = (
                     f"Error sending data to compiler! (Did the compiler crash?)\n"
