@@ -421,7 +421,7 @@ async def run_game(ctx: Jak2Context):
     # These may already be running. If they are not running, try to start them.
     gk_running = False
     try:
-        OpenProcess(process_name=jak2_gk)
+        OpenProcess(name=jak2_gk)
         gk_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Game not running, attempting to start.")
@@ -432,7 +432,7 @@ async def run_game(ctx: Jak2Context):
 
     goalc_running = False
     try:
-        OpenProcess(process_name=jak2_goalc)
+        OpenProcess(name=jak2_goalc)
         goalc_running = True
     except ProcessNotFoundError:
         ctx.on_log_warn(logger, "Compiler not running, attempting to start.")
