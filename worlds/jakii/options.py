@@ -29,6 +29,10 @@ class NumberOfMissionsForCompletion(Range):
     range_end = 92
     default = 65
 
+class MinigameMedalChecks(Toggle):
+    """If enabled, adds bronze/silver/gold medal locations for minigames and races as checks."""
+    display_name = "Minigame Medal Checks"
+
 
 class PercentOfFillerItemsReplacedWithTraps(Range):
     """
@@ -115,6 +119,7 @@ class JakIIOptions(PerGameCommonOptions):
     jak_2_completion_condition: CompletionCondition
     specific_mission_for_completion: SpecificMissionForCompletion
     number_of_missions_for_completion: NumberOfMissionsForCompletion
+    minigame_medal_checks: MinigameMedalChecks
     percent_filler_replaced_with_traps: PercentOfFillerItemsReplacedWithTraps
     trap_effect_duration: TrapEffectDuration
     trap_weights: TrapWeights

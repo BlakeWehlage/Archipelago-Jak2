@@ -15,7 +15,7 @@ from .items import (item_table, ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILL
                     TRAP_ID_START, TRAP_ID_END, Jak2ItemData, Jak2Item)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
-from .locs.mission_locations import Jak2MissionData
+from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations
 from .regs.region_base import JakIIRegion
 
 
@@ -93,7 +93,8 @@ class JakIIWorld(World):
     settings: ClassVar[Jak2Settings]
 
     item_name_to_id = {item_data.name: k for k, item_data in item_table.items()}
-    location_name_to_id = {data.name: k for k, data in all_locations_table.items()}
+    location_name_to_id = {**{data.name: k for k, data in all_locations_table.items()},
+                           **get_minigame_medal_locations(True)}
     item_name_groups = {
         "Items": {item.name for item in item_table.values()}
     }
@@ -212,6 +213,68 @@ class JakIIWorld(World):
             mission = all_locations_table[mission_id]
             mission_tree_region.add_jak_mission(mission_id, mission.name, mission.rule)
 
+        # Minigame bronze/silver/gold medal locations — only added when the option is enabled.
+        if self.options.minigame_medal_checks:
+            scatter_gun_mission = all_locations_table[7]
+            blaster_gun_mission = all_locations_table[18]
+            onin_mission = all_locations_table[39]
+            jetboard_mission = all_locations_table[16]
+            class3_mission = all_locations_table[35]
+            class2_mission = all_locations_table[46]
+            class1_mission = all_locations_table[54]
+            reverse_class3_mission = all_locations_table[131]
+            reverse_class2_mission = all_locations_table[132]
+            reverse_class1_mission = all_locations_table[133]
+            city_port_race_mission = all_locations_table[126]
+            erol_race_mission = all_locations_table[125]
+
+            medal_rules = {
+                "Scatter Gun Course - Bronze Medal": scatter_gun_mission.rule,
+                "Scatter Gun Course - Silver Medal": scatter_gun_mission.rule,
+                "Scatter Gun Course - Gold Medal": scatter_gun_mission.rule,
+                "Blaster Gun Course - Bronze Medal": blaster_gun_mission.rule,
+                "Blaster Gun Course - Silver Medal": blaster_gun_mission.rule,
+                "Blaster Gun Course - Gold Medal": blaster_gun_mission.rule,
+                "Vulcan Fury Gun Course - Bronze Medal": lambda state, player: state.has("Vulcan Fury", player),
+                "Vulcan Fury Gun Course - Silver Medal": lambda state, player: state.has("Vulcan Fury", player),
+                "Vulcan Fury Gun Course - Gold Medal": lambda state, player: state.has("Vulcan Fury", player),
+                "Peacemaker Gun Course - Bronze Medal": lambda state, player: state.has("Peacemaker", player),
+                "Peacemaker Gun Course - Silver Medal": lambda state, player: state.has("Peacemaker", player),
+                "Peacemaker Gun Course - Gold Medal": lambda state, player: state.has("Peacemaker", player),
+                "Onin's Game - Medal": onin_mission.rule,
+                "JET-Board Challenge - Bronze Medal": jetboard_mission.rule,
+                "JET-Board Challenge - Silver Medal": jetboard_mission.rule,
+                "JET-Board Challenge - Gold Medal": jetboard_mission.rule,
+                "Class 3 Race - Bronze Medal": class3_mission.rule,
+                "Class 3 Race - Silver Medal": class3_mission.rule,
+                "Class 3 Race - Gold Medal": class3_mission.rule,
+                "Class 2 Race - Bronze Medal": class2_mission.rule,
+                "Class 2 Race - Silver Medal": class2_mission.rule,
+                "Class 2 Race - Gold Medal": class2_mission.rule,
+                "Class 1 Race - Bronze Medal": class1_mission.rule,
+                "Class 1 Race - Silver Medal": class1_mission.rule,
+                "Class 1 Race - Gold Medal": class1_mission.rule,
+                "Reverse Class 3 Race - Bronze Medal": reverse_class3_mission.rule,
+                "Reverse Class 3 Race - Silver Medal": reverse_class3_mission.rule,
+                "Reverse Class 3 Race - Gold Medal": reverse_class3_mission.rule,
+                "Reverse Class 2 Race - Bronze Medal": reverse_class2_mission.rule,
+                "Reverse Class 2 Race - Silver Medal": reverse_class2_mission.rule,
+                "Reverse Class 2 Race - Gold Medal": reverse_class2_mission.rule,
+                "Reverse Class 1 Race - Bronze Medal": reverse_class1_mission.rule,
+                "Reverse Class 1 Race - Silver Medal": reverse_class1_mission.rule,
+                "Reverse Class 1 Race - Gold Medal": reverse_class1_mission.rule,
+                "City Port Race Side Mission - Bronze Medal": city_port_race_mission.rule,
+                "City Port Race Side Mission - Silver Medal": city_port_race_mission.rule,
+                "City Port Race Side Mission - Gold Medal": city_port_race_mission.rule,
+                "Erol Race - Bronze Medal": erol_race_mission.rule,
+                "Erol Race - Silver Medal": erol_race_mission.rule,
+                "Erol Race - Gold Medal": erol_race_mission.rule,
+            }
+
+            for name, loc_id in get_minigame_medal_locations(True).items():
+                rule = medal_rules.get(name, lambda state, player: True)
+                mission_tree_region.add_jak_mission(loc_id, name, rule)
+
         self.multiworld.regions.append(mission_tree_region)
 
         # Handle completion condition.
@@ -245,6 +308,7 @@ class JakIIWorld(World):
                                             "oracle_cost_level1",
                                             "oracle_cost_level2",
                                             "oracle_cost_level3",
+                                            "minigame_medal_checks",
                                             )
         # Convert the AP mission_id to GOAL's task_id, since ap-verify-game-completed! compares against task_id.
         mission_id = options_dict["specific_mission_for_completion"]
