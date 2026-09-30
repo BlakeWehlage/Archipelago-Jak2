@@ -167,7 +167,9 @@ class Jak2Context(CommonContext):
                     slot_data.get("oracle_cost_level1", 200),
                     slot_data.get("oracle_cost_level2", 200),
                     slot_data.get("oracle_cost_level3", 100),
-                    slot_data.get("minigame_medal_checks", 0)))
+                    slot_data.get("minigame_medal_checks", 0),
+                    slot_data.get("orbs", 1),
+                    slot_data.get("orbsanity", 0)))
 
             # Tell the server if Deathlink is enabled or disabled in-game, allowing us to "remember" the user's choice.
             self.on_deathlink_toggle()
@@ -208,13 +210,10 @@ class Jak2Context(CommonContext):
             # Receiving an item from the server.
             if self.slot_concerns_self(recipient):
                 my_item_name = self.item_names.lookup_in_game(item.item)
-                if is_filler_or_trap(item.item):
-                    if self.slot_concerns_self(item.player):
-                        my_item_finder = "MYSELF"
-                    else:
-                        my_item_finder = self.player_names[item.player]
+                if self.slot_concerns_self(item.player):
+                    my_item_finder = "MYSELF"
                 else:
-                    my_item_name = None
+                    my_item_name = self.player_names[item.player]
 
             # Sending an item to the server.
             if self.slot_concerns_self(item.player) and not self.slot_concerns_self(recipient):

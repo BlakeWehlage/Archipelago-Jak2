@@ -12,11 +12,14 @@ from typing import cast, ClassVar, Any
 from . import options
 from .game_id import jak2_name, jak2_max
 from .items import (item_table, ITEM_ID_KEY_START, ITEM_ID_KEY_END, ITEM_ID_FILLER_START, ITEM_ID_FILLER_END,
-                    TRAP_ID_START, TRAP_ID_END, Jak2ItemData, Jak2Item)
+                    TRAP_ID_START, TRAP_ID_END, ORBSANITY_ID, Jak2ItemData, Jak2Item, orb_item_table,
+                    orb_to_id)
 from .locs import (mission_locations)
 from .locations import (JakIILocation, all_locations_table)
-from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations
+from .locs.mission_locations import Jak2MissionData, get_minigame_medal_locations, get_orb_locations
 from .regs.region_base import JakIIRegion
+
+TOTAL_ORBS = 286
 
 
 class Jak2Settings(settings.Group):
@@ -94,7 +97,7 @@ class JakIIWorld(World):
 
     item_name_to_id = {item_data.name: k for k, item_data in item_table.items()}
     location_name_to_id = {**{data.name: k for k, data in all_locations_table.items()},
-                           **get_minigame_medal_locations(True)}
+                           **get_minigame_medal_locations(True), **get_orb_locations(TOTAL_ORBS)}
     item_name_groups = {
         "Items": {item.name for item in item_table.values()}
     }
@@ -109,6 +112,8 @@ class JakIIWorld(World):
     total_filler_items: int = 0
     total_trap_items: int = 0
     trap_weights: tuple[list[str], list[int]]
+    orb_item_table: str = ""
+    orb_item_id: int = 0
 
     def generate_early(self) -> None:
         # Cache completion conditions and values.
@@ -119,6 +124,11 @@ class JakIIWorld(World):
             self.completion_value = self.options.number_of_missions_for_completion.value
         else:
             raise OptionError(f"Unknown completion condition selected for Jak II: {self.completion_type}")
+
+        if self.options.orbsanity:
+            bundle_size = self.options.orbs.value
+            self.orb_item_name = orb_item_table[bundle_size]
+            self.orb_item_id = orb_to_id[bundle_size]
 
         # Calculate Filler and Traps, if applicable
         available_slots = self.total_items - self.total_prog_items
@@ -143,6 +153,9 @@ class JakIIWorld(World):
         elif TRAP_ID_START <= item <= TRAP_ID_END:
             # Trap Items (their own table) (will also be made manually)
             data.append((0, ItemClass.trap, 0))
+        elif item in orb_to_id.values():
+            # Orbs, count is determined dynamically in create_items(), not here
+            data.append((1, ItemClass.useful, 0))
         else:
             # If we try to make items with ID's outside defined ranges, something has gone wrong
             raise KeyError(f"Tried to fill item pool with unknown ID {item}. Valid ranges: "
@@ -160,6 +173,8 @@ class JakIIWorld(World):
                 continue
             if TRAP_ID_START <= item_id <= TRAP_ID_END:
                 continue
+            if item_id in orb_to_id.values():
+                continue
 
             data = self.item_data_helper(item_id)
             for (count, classification, num) in data:
@@ -167,6 +182,15 @@ class JakIIWorld(World):
                     Jak2Item(item_name, classification, item_id, self.player)
                     for _ in range(count)]
                 items_made += count
+
+        if self.options.orbsanity:
+            bundle_size = self.options.orbs.value
+            num_bundles = TOTAL_ORBS // bundle_size
+            self.multiworld.itempool += [
+                Jak2Item(self.orb_item_name, ItemClass.useful, self.orb_item_id, self.player)
+                for _ in range(num_bundles)
+            ]
+            items_made += num_bundles
 
         # Handle Unfilled Locations!
         all_regions = self.multiworld.get_regions(self.player)
@@ -275,6 +299,12 @@ class JakIIWorld(World):
                 rule = medal_rules.get(name, lambda state, player: True)
                 mission_tree_region.add_jak_mission(loc_id, name, rule)
 
+        if self.options.orbsanity:
+            bundle_size = self.options.orbs.value
+            num_bundles = TOTAL_ORBS // bundle_size
+            for name, loc_id in get_orb_locations(num_bundles).items():
+                mission_tree_region.add_jak_mission(loc_id, name, lambda state, player: True)
+
         self.multiworld.regions.append(mission_tree_region)
 
         # Handle completion condition.
@@ -309,6 +339,8 @@ class JakIIWorld(World):
                                             "oracle_cost_level2",
                                             "oracle_cost_level3",
                                             "minigame_medal_checks",
+                                            "orbsanity",
+                                            "orbs",
                                             )
         # Convert the AP mission_id to GOAL's task_id, since ap-verify-game-completed! compares against task_id.
         mission_id = options_dict["specific_mission_for_completion"]

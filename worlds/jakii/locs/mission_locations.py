@@ -657,3 +657,9 @@ def get_minigame_medal_locations(medal_checks_enabled: bool) -> dict[str, int]:
     if not medal_checks_enabled:
         return {}
     return {medal.name: medal.location_id for medal in minigame_medal_table.values()}
+
+def get_orb_location_id(orb_id: int) -> int:
+    return 50200 + orb_id
+
+def get_orb_locations(max_orbs: int) -> dict[str, int]:
+    return {f"Orb #{i}": get_orb_location_id(i) for i in range(1, max_orbs + 1)}

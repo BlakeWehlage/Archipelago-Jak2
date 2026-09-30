@@ -3,6 +3,9 @@ import struct
 import sys
 from typing import ByteString, Callable
 import json
+
+from .. import get_orb_locations
+
 try:
     from PyMemoryEditor import OpenProcess, PyMemoryEditorError
 except ImportError:
@@ -16,7 +19,8 @@ import Utils
 from worlds.jakii.locs.mission_locations import (main_tasks_to_missions,
                                                  side_tasks_to_missions,
                                                  get_item_id_by_feature_id,
-                                                 medal_ids_to_medals)
+                                                 medal_ids_to_medals,
+                                                 get_orb_location_id)
 from ..game_id import jak2_gk
 
 logger = logging.getLogger("Jak2MemoryReader")
@@ -96,6 +100,11 @@ trap_duration_offset = offsets.define(sizeof_float)
 # Minigame medal information (uint in GOAL = uint64 in C++)
 next_medal_index_offset = offsets.define(sizeof_uint64)
 medals_checked_offset = offsets.define(sizeof_uint32, 40)
+
+# Orb Information
+orbs_found_offset = offsets.define(sizeof_uint32)
+next_orb_index_offset = offsets.define(sizeof_uint64)
+orbs_checked_offset = offsets.define(sizeof_uint32, 286)
 
 # End marker (uint8 array of 4 bytes - "end\0")
 end_marker_offset = offsets.define(sizeof_uint8, 4)
@@ -413,6 +422,15 @@ class Jak2MemoryReader:
             if completed > 0 and not self.finished_game:
                 self.finished_game = True
                 self.log_success(logger, "Congratulations! You finished the game!")
+
+            next_orb_idx = self.read_goal_address(next_orb_index_offset, sizeof_uint64)
+            for i in range(int(next_orb_idx)):
+                raw_orb_id = self.read_goal_address(orbs_checked_offset + (i * sizeof_uint32), sizeof_uint32)
+
+                loc_id = get_orb_location_id(raw_orb_id)
+                if loc_id not in self.location_outbox:
+                    self.location_outbox.append(loc_id)
+                    logger.debug(f"Orb checked! Orb ID: {raw_orb_id} -> Location ID: {loc_id}")
 
             death_count = self.read_goal_address(death_count_offset, sizeof_uint32)
             death_cause = self.read_goal_address(death_cause_offset, sizeof_uint8)
